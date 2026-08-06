@@ -63,7 +63,7 @@ for classobj in SoundLoader._classes:
 
 from kivy.animation import Animation
 from kivy.base import ExceptionHandler, ExceptionManager
-from kivy.clock import Clock
+from kivy.clock import Clock, mainthread
 from kivy.core.clipboard import Clipboard
 from kivy.core.image import ImageData, ImageLoader, ImageLoaderBase
 from kivy.core.text.markup import MarkupLabel
@@ -105,6 +105,9 @@ fade_in_animation = Animation(opacity=0, duration=0) + Animation(opacity=1, dura
 
 import json
 
+from watchdog import events
+from watchdog.observers import Observer
+
 from NetUtils import HintStatus, JSONMessagePart, JSONtoTextParser, SlotType
 from Utils import async_start, get_input_text_from_response
 
@@ -119,10 +122,19 @@ remove_between_brackets = re.compile(r"\[.*?]")
 
 
 class ThemedApp(MDApp):
-    def set_colors(self):
-        theme_colors: MaterialYouOptionsParser = MaterialYouOptionsParser()
+    opts_path: str = Utils.local_path("data", "theme.json")
 
-        if theme_colors.use_wallpaper:
+    @mainthread
+    def set_colors(self):
+        theme_colors: MaterialYouOptionsParser = MaterialYouOptionsParser(self.opts_path)
+        text_colors = KivyJSONtoTextParser.TextColors()
+
+        self.theme_cls.theme_style = text_colors.theme_style
+        self.theme_cls.primary_palette = text_colors.primary_palette
+        self.theme_cls.dynamic_scheme_name = text_colors.dynamic_scheme_name
+        self.theme_cls.dynamic_scheme_contrast = text_colors.dynamic_scheme_contrast
+
+        if theme_colors.use_wallpaper and theme_colors.path_to_wallpaper:
             self.theme_cls.dynamic_color = True
             self.theme_cls.path_to_wallpaper = theme_colors.path_to_wallpaper
 
@@ -270,6 +282,27 @@ class ThemedApp(MDApp):
         # self.theme_cls.neutralPaletteKeyColorColor = theme_colors.neutral_palette_key_color_color
         # self.theme_cls.neutralVariantPaletteKeyColorColor = theme_colors.neutral_variant_palette_key_color_color
         # self.theme_cls.errorPaletteKeyColorColor = theme_colors.error_palette_key_color_color
+
+    # NOTE
+    # Handling of watchdog inside Kivy is based on tshirtman's github gist
+    # It's not too different from how watchdog is generally used,
+    # but it did point to where it should be instantiated, started and stopped
+    # https://gist.github.com/tshirtman/6623577
+    def setup_options_watcher(self):
+        handler = MaterialYouOptionsHandler(self.opts_path, self.set_colors)
+        observer = Observer()
+
+        observer.schedule(handler, path=Utils.local_path("data"))
+        observer.start()
+
+        self.observer = observer
+
+    def stop_options_watcher(self):
+        if not self.observer:
+            return
+
+        self.observer.stop()
+        self.observer.join()
 
 
 class ImageIcon(MDButtonIcon, AsyncImage):
@@ -1132,6 +1165,8 @@ class GameManager(ThemedApp):
         # from kivy.modules import console
         # console.create_console(Window, self.container)
 
+        self.setup_options_watcher()
+
         return self.container
 
     def add_client_tab(self, title: str, content: Widget, index: int = -1) -> MDNavigationItemBase:
@@ -1225,6 +1260,8 @@ class GameManager(ThemedApp):
         for x in range(self.ctx.input_requests):
             self.ctx.input_queue.put_nowait("")
         self.ctx.input_requests = 0
+
+        self.stop_options_watcher()
 
         self.ctx.exit_event.set()
 
@@ -1596,13 +1633,14 @@ class KivyJSONtoTextParser(JSONtoTextParser):
 
 
 class MaterialYouOptionsParser:
-    def __init__(self):
+    def __init__(self, opts_path: str):
+        self.opts_path = opts_path
         self.set_opts()
 
-    def set_opts(self, opt_path: str = Utils.local_path("data", "theme.json")):
+    def set_opts(self):
         opts: dict = {}
         try:
-            with open(opt_path, "r") as f:
+            with open(self.opts_path, "r") as f:
                 opts = json.load(f)
                 f.close()
         except FileNotFoundError:
@@ -1610,9 +1648,11 @@ class MaterialYouOptionsParser:
             pass
         except PermissionError:
             logging.warning(
-                "MaterialYouOptionsParser: colors.json was found,"
+                f"MaterialYouOptionsParser: {self.opts_path} was found,"
                 "but could not be accessed. Please check your permissions."
             )
+        except json.JSONDecodeError:
+            logging.warning("MaterialYouOptionsParser: The options json is malformed. Please check your options json.")
 
         # Wallpaper Options
         self.use_wallpaper: bool = opts.get("use_wallpaper", False)
@@ -1680,6 +1720,21 @@ class MaterialYouOptionsParser:
         self.tertiary_fixed_color: str | None = opts.get("tertiary_fixed_color", None)
         self.tertiary_fixed_dim_color: str | None = opts.get("tertiary_fixed_dim_color", None)
         self.tertiary_palette_key_color_color: str | None = opts.get("tertiary_palette_key_color_color", None)
+
+
+class MaterialYouOptionsHandler(events.FileSystemEventHandler):
+    def __init__(self, target_file: str, action_on_event: typing.Callable) -> None:
+        super().__init__()
+
+        self.target_file = target_file
+        self.action_on_event = action_on_event
+
+    def on_modified(self, event: events.DirModifiedEvent | events.FileModifiedEvent):
+        if event.is_directory:
+            return
+
+        if event.src_path == self.target_file:
+            self.action_on_event()
 
 
 ExceptionManager.add_handler(E())

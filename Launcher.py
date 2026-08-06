@@ -29,11 +29,21 @@ if __name__ == "__main__":
 
 import settings
 import Utils
-from Utils import (env_cleared_lib_path, init_logging, is_frozen, is_linux, is_macos, is_windows, local_path,
-                   messagebox, open_filename, user_path)
+from Utils import (
+    env_cleared_lib_path,
+    init_logging,
+    is_frozen,
+    is_linux,
+    is_macos,
+    is_windows,
+    local_path,
+    messagebox,
+    open_filename,
+    user_path,
+)
 
 if __name__ == "__main__":
-    init_logging('Launcher')
+    init_logging("Launcher")
 
 from worlds.LauncherComponents import Component, components, icon_paths, SuffixIdentifier, Type
 
@@ -44,8 +54,9 @@ def open_host_yaml():
     s.save()
     assert file, "host.yaml missing"
     if is_linux:
-        exe = which('sensible-editor') or which('gedit') or \
-              which('xdg-open') or which('gnome-open') or which('kde-open')
+        exe = (
+            which("sensible-editor") or which("gedit") or which("xdg-open") or which("gnome-open") or which("kde-open")
+        )
     elif is_macos:
         exe = which("open")
     else:
@@ -55,12 +66,15 @@ def open_host_yaml():
     env = env_cleared_lib_path()
     subprocess.Popen([exe, file], env=env)
 
+
 def open_patch():
     suffixes = []
     for c in components:
-        if c.type == Type.CLIENT and \
-                isinstance(c.file_identifier, SuffixIdentifier) and \
-                (c.script_name is None or isfile(get_exe(c)[-1])):
+        if (
+            c.type == Type.CLIENT
+            and isinstance(c.file_identifier, SuffixIdentifier)
+            and (c.script_name is None or isfile(get_exe(c)[-1]))
+        ):
             suffixes += c.file_identifier.suffixes
     try:
         filename = open_filename("Select patch", (("Patches", suffixes),))
@@ -95,7 +109,7 @@ def browse_files():
 
 def open_folder(folder_path):
     if is_linux:
-        exe = which('xdg-open') or which('gnome-open') or which('kde-open')
+        exe = which("xdg-open") or which("gnome-open") or which("kde-open")
     elif is_macos:
         exe = which("open")
     else:
@@ -111,27 +125,52 @@ def open_folder(folder_path):
 
 def update_settings():
     from settings import get_settings
+
     get_settings().save()
 
 
-components.extend([
-    # Functions
-    Component("Open host.yaml", func=open_host_yaml,
-              description="Open the host.yaml file to change settings for generation, games, and more."),
-    Component("Open Patch", func=open_patch,
-              description="Open a patch file, downloaded from the room page or provided by the host."),
-    Component("Generate Template Options", func=generate_yamls,
-              description="Generate template YAMLs for currently installed games."),
-    Component("Archipelago Website", func=lambda: webbrowser.open("https://archipelago.gg/"),
-              description="Open archipelago.gg in your browser."),
-    Component("Discord Server", icon="discord", func=lambda: webbrowser.open("https://discord.gg/8Z65BR2"),
-              description="Join the Discord server to play public multiworlds, report issues, or just chat!"),
-    Component("Unrated/18+ Discord Server", icon="discord",
-              func=lambda: webbrowser.open("https://discord.gg/fqvNCCRsu4"),
-              description="Find unrated and 18+ games in the After Dark Discord server."),
-    Component("Browse Files", func=browse_files,
-              description="Open the Archipelago installation folder in your file browser."),
-])
+components.extend(
+    [
+        # Functions
+        Component(
+            "Open host.yaml",
+            func=open_host_yaml,
+            description="Open the host.yaml file to change settings for generation, games, and more.",
+        ),
+        Component(
+            "Open Patch",
+            func=open_patch,
+            description="Open a patch file, downloaded from the room page or provided by the host.",
+        ),
+        Component(
+            "Generate Template Options",
+            func=generate_yamls,
+            description="Generate template YAMLs for currently installed games.",
+        ),
+        Component(
+            "Archipelago Website",
+            func=lambda: webbrowser.open("https://archipelago.gg/"),
+            description="Open archipelago.gg in your browser.",
+        ),
+        Component(
+            "Discord Server",
+            icon="discord",
+            func=lambda: webbrowser.open("https://discord.gg/8Z65BR2"),
+            description="Join the Discord server to play public multiworlds, report issues, or just chat!",
+        ),
+        Component(
+            "Unrated/18+ Discord Server",
+            icon="discord",
+            func=lambda: webbrowser.open("https://discord.gg/fqvNCCRsu4"),
+            description="Find unrated and 18+ games in the After Dark Discord server.",
+        ),
+        Component(
+            "Browse Files",
+            func=browse_files,
+            description="Open the Archipelago installation folder in your file browser.",
+        ),
+    ]
+)
 
 
 def handle_uri(path: str) -> tuple[list[Component], Component]:
@@ -150,13 +189,14 @@ def handle_uri(path: str) -> tuple[list[Component], Component]:
 
 def build_uri_popup(component_list: list[Component], launch_args: tuple[str, ...]) -> None:
     from kvui import ButtonsPrompt
-    component_options = {
-        component.display_name: component for component in component_list
-    }
-    popup = ButtonsPrompt("Connect to Multiworld",
-                          "Select client to open and connect with.",
-                          lambda component_name: run_component(component_options[component_name], *launch_args),
-                          *component_options.keys())
+
+    component_options = {component.display_name: component for component in component_list}
+    popup = ButtonsPrompt(
+        "Connect to Multiworld",
+        "Select client to open and connect with.",
+        lambda component_name: run_component(component_options[component_name], *launch_args),
+        *component_options.keys(),
+    )
     popup.open()
 
 
@@ -226,17 +266,25 @@ def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
 
 def create_shortcut(button: Any, component: Component) -> None:
     from pyshortcuts import make_shortcut
+
     env = os.environ
     if "APPIMAGE" in env:
         script = env["ARGV0"]
-        wkdir = None # defaults to ~ on Linux
+        wkdir = None  # defaults to ~ on Linux
     else:
         script = sys.argv[0]
         wkdir = Utils.local_path()
 
-    script = f"{script} \"{component.display_name}\""
-    make_shortcut(script, name=f"Archipelago {component.display_name}", icon=local_path("data", "icon.ico"),
-                  startmenu=False, terminal=False, working_dir=wkdir, noexe=Utils.is_frozen())
+    script = f'{script} "{component.display_name}"'
+    make_shortcut(
+        script,
+        name=f"Archipelago {component.display_name}",
+        icon=local_path("data", "icon.ico"),
+        startmenu=False,
+        terminal=False,
+        working_dir=wkdir,
+        noexe=Utils.is_frozen(),
+    )
     button.menu.dismiss()
 
 
@@ -244,7 +292,7 @@ refresh_components: Callable[[], None] | None = None
 
 
 def run_gui(launch_components: list[Component], args: Any) -> None:
-    from kvui import (ThemedApp, MDFloatLayout, MDGridLayout, ScrollBox)
+    from kvui import ThemedApp, MDFloatLayout, MDGridLayout, ScrollBox
     from kivy.properties import ObjectProperty
     from kivy.core.window import Window
     from kivy.metrics import dp
@@ -310,14 +358,13 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
 
         def build_card(self, component: Component) -> LauncherCard:
             """
-                Builds a card widget for a given component.
+            Builds a card widget for a given component.
 
-                :param component: The component associated with the button.
+            :param component: The component associated with the button.
 
-                :return: The created Card Widget.
-                """
-            button_card = LauncherCard(component=component,
-                                       image_path=icon_paths[component.icon])
+            :return: The created Card Widget.
+            """
+            button_card = LauncherCard(component=component, image_path=icon_paths[component.icon])
 
             def open_menu(caller):
                 caller.menu.open()
@@ -326,7 +373,7 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
                 {
                     "text": "Add shortcut on desktop",
                     "leading_icon": "laptop",
-                    "on_release": lambda: create_shortcut(button_card.context_button, component)
+                    "on_release": lambda: create_shortcut(button_card.context_button, component),
                 }
             ]
             button_card.context_button.menu = MDDropdownMenu(caller=button_card.context_button, items=menu_items)
@@ -345,16 +392,18 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
             for child in tool_children:
                 self.button_layout.layout.remove_widget(child)
 
-            cards = [card for card in self.cards if card.component.type in type_filter
-                     or favorites and card.component.display_name in self.favorites]
+            cards = [
+                card
+                for card in self.cards
+                if card.component.type in type_filter or favorites and card.component.display_name in self.favorites
+            ]
 
             self.current_filter = type_filter
 
             for card in cards:
                 self.button_layout.layout.add_widget(card)
 
-            top = self.button_layout.children[0].y + self.button_layout.children[0].height \
-                           - self.button_layout.height
+            top = self.button_layout.children[0].y + self.button_layout.children[0].height - self.button_layout.height
             scroll_percent = self.button_layout.convert_distance_to_scroll(0, top)
             self.button_layout.scroll_y = max(0, min(1, scroll_percent[1]))
 
@@ -368,7 +417,8 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
                 return
 
             sub_matches = [
-                card for card in self.cards
+                card
+                for card in self.cards
                 if name.lower() in card.component.display_name.lower() and card.component.type != Type.HIDDEN
             ]
             self.button_layout.layout.clear_widgets()
@@ -400,6 +450,8 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
             # from kivy.modules.console import create_console
             # create_console(Window, self.top_screen)
 
+            self.setup_options_watcher()
+
             return self.top_screen
 
         def on_start(self):
@@ -419,11 +471,10 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
                 if not launch(get_exe(button.component), button.component.cli) and button.component.cli:
                     open_text = "Running in the background..."
 
-            MDSnackbar(MDSnackbarText(text=open_text), y=dp(24), pos_hint={"center_x": 0.5},
-                       size_hint_x=0.5).open()
+            MDSnackbar(MDSnackbarText(text=open_text), y=dp(24), pos_hint={"center_x": 0.5}, size_hint_x=0.5).open()
 
         def _on_drop_file(self, window: Window, filename: bytes, x: int, y: int) -> None:
-            """ When a patch file is dropped into the window, run the associated component. """
+            """When a patch file is dropped into the window, run the associated component."""
             file, component = identify(filename.decode())
             if file and component:
                 run_component(component, file)
@@ -447,8 +498,14 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
 
         def on_stop(self):
             Utils.persistent_store("launcher", "favorites", self.favorites)
-            Utils.persistent_store("launcher", "filter", ", ".join(filter.name if isinstance(filter, Type) else filter
-                                                                   for filter in self.current_filter))
+            Utils.persistent_store(
+                "launcher",
+                "filter",
+                ", ".join(filter.name if isinstance(filter, Type) else filter for filter in self.current_filter),
+            )
+
+            self.stop_options_watcher()
+
             super().on_stop()
 
     Launcher(components=launch_components, args=args).run()
@@ -485,13 +542,13 @@ def main(args: argparse.Namespace | dict | None = None):
             if not components:
                 args["component"] = text_client_component
             else:
-                args['launch_components'] = [text_client_component, *components]
+                args["launch_components"] = [text_client_component, *components]
         else:
             file, component = identify(path)
             if file:
-                args['file'] = file
+                args["file"] = file
             if component:
-                args['component'] = component
+                args["component"] = component
             if not component:
                 logging.warning(f"Could not identify Component responsible for {path}")
 
@@ -505,21 +562,22 @@ def main(args: argparse.Namespace | dict | None = None):
         run_gui(args.get("launch_components", None), args.get("args", ()))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     multiprocessing.freeze_support()
     multiprocessing.set_start_method("spawn")  # if launched process uses kivy, fork won't work
     parser = argparse.ArgumentParser(
-        description='Archipelago Launcher',
-        usage="[-h] [--update_settings] [Patch|Game|Component] [-- component args here]"
+        description="Archipelago Launcher",
+        usage="[-h] [--update_settings] [Patch|Game|Component] [-- component args here]",
     )
     run_group = parser.add_argument_group("Run")
-    run_group.add_argument("--update_settings", action="store_true",
-                           help="Update host.yaml and exit.")
-    run_group.add_argument("Patch|Game|Component|url", type=str, nargs="?",
-                           help="Pass either a patch file, a generated game, the component name to run, or a url to "
-                                "connect with.")
-    run_group.add_argument("args", nargs="*",
-                           help="Arguments to pass to component.")
+    run_group.add_argument("--update_settings", action="store_true", help="Update host.yaml and exit.")
+    run_group.add_argument(
+        "Patch|Game|Component|url",
+        type=str,
+        nargs="?",
+        help="Pass either a patch file, a generated game, the component name to run, or a url to connect with.",
+    )
+    run_group.add_argument("args", nargs="*", help="Arguments to pass to component.")
     main(parser.parse_args())
 
     from worlds.LauncherComponents import processes
