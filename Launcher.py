@@ -30,15 +30,18 @@ import Utils
 from Utils import init_logging, local_path
 
 if __name__ == "__main__":
-    init_logging('Launcher')
+    init_logging("Launcher")
+
 
 def update_settings():
     from settings import get_settings
+
     get_settings().save()
 
 
 def handle_uri(path: str) -> tuple[list["Component"], "Component"]:
     from worlds.LauncherComponents import components
+
     url = urllib.parse.urlparse(path)
     queries = urllib.parse.parse_qs(url.query)
     client_components = []
@@ -54,15 +57,15 @@ def handle_uri(path: str) -> tuple[list["Component"], "Component"]:
 
 def build_uri_popup(component_list: list["Component"], launch_args: tuple[str, ...]) -> None:
     from kvui import ButtonsPrompt
-    component_options = {
-        component.display_name: component for component in component_list
-    }
-    popup = ButtonsPrompt("Connect to Multiworld",
-                          "Select client to open and connect with.",
-                          lambda component_name: run_component(component_options[component_name], *launch_args),
-                          *component_options.keys())
-    popup.open()
 
+    component_options = {component.display_name: component for component in component_list}
+    popup = ButtonsPrompt(
+        "Connect to Multiworld",
+        "Select client to open and connect with.",
+        lambda component_name: run_component(component_options[component_name], *launch_args),
+        *component_options.keys(),
+    )
+    popup.open()
 
 
 def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
@@ -78,17 +81,25 @@ def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
 
 def create_shortcut(button: Any, component: "Component") -> None:
     from pyshortcuts import make_shortcut
+
     env = os.environ
     if "APPIMAGE" in env:
         script = env["ARGV0"]
-        wkdir = None # defaults to ~ on Linux
+        wkdir = None  # defaults to ~ on Linux
     else:
         script = sys.argv[0]
         wkdir = Utils.local_path()
 
-    script = f"{script} \"{component.display_name}\""
-    make_shortcut(script, name=f"Archipelago {component.display_name}", icon=local_path("data", "icon.ico"),
-                  startmenu=False, terminal=False, working_dir=wkdir, noexe=Utils.is_frozen())
+    script = f'{script} "{component.display_name}"'
+    make_shortcut(
+        script,
+        name=f"Archipelago {component.display_name}",
+        icon=local_path("data", "icon.ico"),
+        startmenu=False,
+        terminal=False,
+        working_dir=wkdir,
+        noexe=Utils.is_frozen(),
+    )
     button.menu.dismiss()
 
 
@@ -97,8 +108,16 @@ refresh_components: Callable[[], None] | None = None
 
 def run_gui(launch_components: list["Component"], args: Any) -> None:
     import threading
-    from kvui import (ThemedApp, MDFloatLayout, MDGridLayout, ScrollBox,
-                      MDScreenManager, MDScreen, LoadingScreen, LogtoLoadingScreen)
+    from kvui import (
+        ThemedApp,
+        MDFloatLayout,
+        MDGridLayout,
+        ScrollBox,
+        MDScreenManager,
+        MDScreen,
+        LoadingScreen,
+        LogtoLoadingScreen,
+    )
     from kivy.properties import BooleanProperty, ObjectProperty
     from kivy.core.window import Window
     from kivy.metrics import dp
@@ -145,6 +164,7 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
 
         def load_filter(self):
             from worlds.LauncherComponents import Type
+
             self.current_filter = (Type.CLIENT, Type.TOOL, Type.ADJUSTER, Type.MISC)
             persistent = Utils.persistent_load()
             if "launcher" in persistent:
@@ -170,15 +190,15 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
 
         def build_card(self, component: "Component") -> LauncherCard:
             """
-                Builds a card widget for a given component.
+            Builds a card widget for a given component.
 
-                :param component: The component associated with the button.
+            :param component: The component associated with the button.
 
                 :return: The created Card Widget.
-                """
+            """
             from worlds.LauncherComponents import icon_paths
-            button_card = LauncherCard(component=component,
-                                       image_path=icon_paths[component.icon])
+
+            button_card = LauncherCard(component=component, image_path=icon_paths[component.icon])
 
             def open_menu(caller):
                 caller.menu.open()
@@ -187,7 +207,7 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
                 {
                     "text": "Add shortcut on desktop",
                     "leading_icon": "laptop",
-                    "on_release": lambda: create_shortcut(button_card.context_button, component)
+                    "on_release": lambda: create_shortcut(button_card.context_button, component),
                 }
             ]
             button_card.context_button.menu = MDDropdownMenu(caller=button_card.context_button, items=menu_items)
@@ -198,6 +218,7 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
         def _refresh_components(self, type_filter: Sequence["Type"] | None = None) -> None:
             if not type_filter:
                 from worlds.LauncherComponents import Type
+
                 type_filter = [Type.CLIENT, Type.ADJUSTER, Type.TOOL, Type.MISC]
             favorites = "favorites" in type_filter
 
@@ -207,16 +228,18 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
             for child in tool_children:
                 self.button_layout.layout.remove_widget(child)
 
-            cards = [card for card in self.cards if card.component.type in type_filter
-                     or favorites and card.component.display_name in self.favorites]
+            cards = [
+                card
+                for card in self.cards
+                if card.component.type in type_filter or favorites and card.component.display_name in self.favorites
+            ]
 
             self.current_filter = type_filter
 
             for card in cards:
                 self.button_layout.layout.add_widget(card)
 
-            top = self.button_layout.children[0].y + self.button_layout.children[0].height \
-                           - self.button_layout.height
+            top = self.button_layout.children[0].y + self.button_layout.children[0].height - self.button_layout.height
             scroll_percent = self.button_layout.convert_distance_to_scroll(0, top)
             self.button_layout.scroll_y = max(0, min(1, scroll_percent[1]))
 
@@ -231,7 +254,8 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
             from worlds.LauncherComponents import Type
 
             sub_matches = [
-                card for card in self.cards
+                card
+                for card in self.cards
                 if name.lower() in card.component.display_name.lower() and card.component.type != Type.HIDDEN
             ]
             self.button_layout.layout.clear_widgets()
@@ -262,6 +286,8 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
             main_screen.add_widget(self.top_screen)
             self.screen_manager.add_widget(main_screen)
 
+            self.setup_options_watcher()
+
             return self.screen_manager
 
         def on_start(self):
@@ -283,6 +309,7 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
             else:
                 import importlib
                 import time
+
                 start = time.perf_counter()
                 importlib.import_module("worlds")
                 logging.error(f"Worlds module loaded in {time.perf_counter() - start:.2f} seconds")
@@ -299,6 +326,7 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
         def finish_loading(self, dt):
             from worlds.LauncherComponents import components
             from worlds import failed_world_loads
+
             logger = logging.getLogger("Worlds")
             self.failed_worlds = bool(failed_world_loads)
             for component in components:
@@ -316,18 +344,20 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
             else:
                 # if launch returns False, it started the process in background (not in a new terminal)
                 from worlds.LauncherComponents import get_exe
+
                 if not launch(get_exe(button.component), button.component.cli) and button.component.cli:
                     open_text = "Running in the background..."
 
-            MDSnackbar(MDSnackbarText(text=open_text), y=dp(24), pos_hint={"center_x": 0.5},
-                       size_hint_x=0.5).open()
+            MDSnackbar(MDSnackbarText(text=open_text), y=dp(24), pos_hint={"center_x": 0.5}, size_hint_x=0.5).open()
 
         @staticmethod
         def copy_to_clipboard(text):
             from kivy.core.clipboard import Clipboard
+
             Clipboard.copy(text)
-            MDSnackbar(MDSnackbarText(text="Copied to clipboard."), y=dp(24), pos_hint={"center_x": 0.5},
-                       size_hint_x=0.5).open()
+            MDSnackbar(
+                MDSnackbarText(text="Copied to clipboard."), y=dp(24), pos_hint={"center_x": 0.5}, size_hint_x=0.5
+            ).open()
 
         def display_failed(self):
             """Display a dialog showing the exceptions produced by any world that failed to load during
@@ -338,13 +368,16 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
             from kivymd.uix.divider import MDDivider
             from worlds import failed_world_loads
             from kivymd.uix.list import MDListItem, MDListItemHeadlineText, MDListItemSupportingText
+
             entries = []
             for world, reason in failed_world_loads.items():
-                entries.append(MDListItem(
-                    MDListItemHeadlineText(text=world),
-                    MDListItemSupportingText(text=reason),
-                    on_release=lambda x, r=reason: self.copy_to_clipboard(r)
-                ))
+                entries.append(
+                    MDListItem(
+                        MDListItemHeadlineText(text=world),
+                        MDListItemSupportingText(text=reason),
+                        on_release=lambda x, r=reason: self.copy_to_clipboard(r),
+                    )
+                )
             dialog = MDDialog(
                 MDDialogIcon(icon="alert"),
                 MDDialogHeadlineText(text="Failed World Loads"),
@@ -352,13 +385,14 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
                     MDDivider(),
                     *entries,
                     orientation="vertical",
-                )
+                ),
             )
             dialog.open()
 
         def _on_drop_file(self, window: Window, filename: bytes, x: int, y: int) -> None:
-            """ When a patch file is dropped into the window, run the associated component. """
+            """When a patch file is dropped into the window, run the associated component."""
             from worlds.LauncherComponents import identify
+
             file, component = identify(filename.decode())
             if file and component:
                 run_component(component, file)
@@ -382,9 +416,16 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
 
         def on_stop(self):
             from worlds.LauncherComponents import Type
+
             Utils.persistent_store("launcher", "favorites", self.favorites)
-            Utils.persistent_store("launcher", "filter", ", ".join(filter.name if isinstance(filter, Type) else filter
-                                                                   for filter in self.current_filter))
+            Utils.persistent_store(
+                "launcher",
+                "filter",
+                ", ".join(filter.name if isinstance(filter, Type) else filter for filter in self.current_filter),
+            )
+
+            self.stop_options_watcher()
+
             super().on_stop()
 
     Launcher(components=launch_components, args=args).run()
@@ -417,14 +458,15 @@ def main(args: argparse.Namespace | dict | None = None):
             if not components:
                 args["component"] = text_client_component
             else:
-                args['launch_components'] = [text_client_component, *components]
+                args["launch_components"] = [text_client_component, *components]
         else:
             from worlds.LauncherComponents import identify
+
             file, component = identify(path)
             if file:
-                args['file'] = file
+                args["file"] = file
             if component:
-                args['component'] = component
+                args["component"] = component
             if not component:
                 logging.warning(f"Could not identify Component responsible for {path}")
 
@@ -438,21 +480,22 @@ def main(args: argparse.Namespace | dict | None = None):
         run_gui(args.get("launch_components", None), args.get("args", ()))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     multiprocessing.freeze_support()
     multiprocessing.set_start_method("spawn")  # if launched process uses kivy, fork won't work
     parser = argparse.ArgumentParser(
-        description='Archipelago Launcher',
-        usage="[-h] [--update_settings] [Patch|Game|Component] [-- component args here]"
+        description="Archipelago Launcher",
+        usage="[-h] [--update_settings] [Patch|Game|Component] [-- component args here]",
     )
     run_group = parser.add_argument_group("Run")
-    run_group.add_argument("--update_settings", action="store_true",
-                           help="Update host.yaml and exit.")
-    run_group.add_argument("Patch|Game|Component|url", type=str, nargs="?",
-                           help="Pass either a patch file, a generated game, the component name to run, or a url to "
-                                "connect with.")
-    run_group.add_argument("args", nargs="*",
-                           help="Arguments to pass to component.")
+    run_group.add_argument("--update_settings", action="store_true", help="Update host.yaml and exit.")
+    run_group.add_argument(
+        "Patch|Game|Component|url",
+        type=str,
+        nargs="?",
+        help="Pass either a patch file, a generated game, the component name to run, or a url to connect with.",
+    )
+    run_group.add_argument("args", nargs="*", help="Arguments to pass to component.")
     main(parser.parse_args())
 
     from worlds.LauncherComponents import processes
