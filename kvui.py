@@ -1,11 +1,12 @@
-import os
+import io
 import logging
+import os
+import pkgutil
+import re
 import sys
 import typing
-import re
-import io
-import pkgutil
 from collections import deque
+
 assert "kivy" not in sys.modules, "kvui should be imported before kivy for frozen compatibility"
 
 if sys.platform == "win32":
@@ -27,6 +28,7 @@ if Utils.is_frozen():
     os.environ["KIVY_DATA_DIR"] = Utils.local_path("data")
 
 import platformdirs
+
 os.environ["KIVY_HOME"] = os.path.join(platformdirs.user_config_dir("Archipelago", False), "kivy")
 os.makedirs(os.environ["KIVY_HOME"], exist_ok=True)
 
@@ -38,9 +40,10 @@ Config.set("graphics", "multisamples", "0")  # multisamples crash old intel driv
 
 # Workaround for Kivy issue #9226.
 # caused by kivy by default using probesysfs,
-# which assumes all multi touch deviecs are touch screens. 
+# which assumes all multi touch deviecs are touch screens.
 # workaround provided by Snu of the kivy commmunity c:
 from kivy.utils import platform
+
 if platform == "linux":
     options = Config.options("input")
     for option in options:
@@ -52,55 +55,57 @@ if platform == "linux":
 # kivymd imports kivy.core.window, so we have to do this before the first kivymd import.
 # No longer necessary when we switch to kivy 3.0.0, which fixes this issue.
 from kivy.core.audio import SoundLoader
+
 for classobj in SoundLoader._classes:
     # The least invasive way to force a SoundLoader class to load its audio engine seems to be calling
     # .extensions(), which e.g. in audio_sdl2.pyx then calls a function called "mix_init()"
     classobj.extensions()
 
-from kivymd.uix.divider import MDDivider
-from kivy.core.window import Window
-from kivy.core.clipboard import Clipboard
-from kivy.core.text.markup import MarkupLabel
-from kivy.core.image import ImageLoader, ImageLoaderBase, ImageData
+from kivy.animation import Animation
 from kivy.base import ExceptionHandler, ExceptionManager
 from kivy.clock import Clock
+from kivy.core.clipboard import Clipboard
+from kivy.core.image import ImageData, ImageLoader, ImageLoaderBase
+from kivy.core.text.markup import MarkupLabel
+from kivy.core.window import Window
 from kivy.factory import Factory
-from kivy.properties import BooleanProperty, ObjectProperty, NumericProperty, StringProperty
-from kivy.metrics import dp, sp
-from kivy.uix.widget import Widget
-from kivy.uix.layout import Layout
-from kivy.utils import escape_markup
 from kivy.lang import Builder
-from kivy.uix.recycleview.views import RecycleDataViewBehavior
+from kivy.metrics import dp, sp
+from kivy.properties import BooleanProperty, NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.behaviors import FocusBehavior, ToggleButtonBehavior
+from kivy.uix.image import AsyncImage
+from kivy.uix.layout import Layout
+from kivy.uix.popup import Popup
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.recycleview.layout import LayoutSelectionBehavior
-from kivy.animation import Animation
-from kivy.uix.popup import Popup
-from kivy.uix.image import AsyncImage
+from kivy.uix.recycleview.views import RecycleDataViewBehavior
+from kivy.uix.widget import Widget
+from kivy.utils import escape_markup
 from kivymd.app import MDApp
-from kivymd.uix.dialog import MDDialog, MDDialogHeadlineText, MDDialogSupportingText, MDDialogButtonContainer
-from kivymd.uix.gridlayout import MDGridLayout
-from kivymd.uix.floatlayout import MDFloatLayout
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.navigationbar import MDNavigationBar, MDNavigationItem
-from kivymd.uix.screen import MDScreen
-from kivymd.uix.screenmanager import MDScreenManager
-
+from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText, MDIconButton
+from kivymd.uix.dialog import MDDialog, MDDialogButtonContainer, MDDialogHeadlineText, MDDialogSupportingText
+from kivymd.uix.divider import MDDivider
+from kivymd.uix.dropdownitem import MDDropDownItem, MDDropDownItemText
+from kivymd.uix.floatlayout import MDFloatLayout
+from kivymd.uix.gridlayout import MDGridLayout
+from kivymd.uix.label import MDIcon, MDLabel
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.menu.menu import MDDropdownTextItem
-from kivymd.uix.dropdownitem import MDDropDownItem, MDDropDownItemText
-from kivymd.uix.button import MDButton, MDButtonText, MDButtonIcon, MDIconButton
-from kivymd.uix.label import MDLabel, MDIcon
-from kivymd.uix.recycleview import MDRecycleView
-from kivymd.uix.textfield.textfield import MDTextField
+from kivymd.uix.navigationbar import MDNavigationBar, MDNavigationItem
 from kivymd.uix.progressindicator import MDLinearProgressIndicator
+from kivymd.uix.recycleview import MDRecycleView
+from kivymd.uix.screen import MDScreen
+from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.scrollview import MDScrollView
+from kivymd.uix.textfield.textfield import MDTextField
 from kivymd.uix.tooltip import MDTooltip, MDTooltipPlain
 
 fade_in_animation = Animation(opacity=0, duration=0) + Animation(opacity=1, duration=0.25)
 
-from NetUtils import JSONtoTextParser, JSONMessagePart, SlotType, HintStatus
+import json
+
+from NetUtils import HintStatus, JSONMessagePart, JSONtoTextParser, SlotType
 from Utils import async_start, get_input_text_from_response
 
 if typing.TYPE_CHECKING:
@@ -115,11 +120,156 @@ remove_between_brackets = re.compile(r"\[.*?]")
 
 class ThemedApp(MDApp):
     def set_colors(self):
-        text_colors = KivyJSONtoTextParser.TextColors()
-        self.theme_cls.theme_style = text_colors.theme_style
-        self.theme_cls.primary_palette = text_colors.primary_palette
-        self.theme_cls.dynamic_scheme_name = text_colors.dynamic_scheme_name
-        self.theme_cls.dynamic_scheme_contrast = text_colors.dynamic_scheme_contrast
+        theme_colors: MaterialYouOptionsParser = MaterialYouOptionsParser()
+
+        if theme_colors.use_wallpaper:
+            self.theme_cls.dynamic_color = True
+            self.theme_cls.path_to_wallpaper = theme_colors.path_to_wallpaper
+
+            return
+        if self.theme_cls.dynamic_color:
+            self.theme_cls.dynamic_color = False
+            self.theme_cls.path_to_wallpaper = None
+
+        if theme_colors.primary_color:
+            self.theme_cls.primaryColor = theme_colors.primary_color
+
+        # self.theme_cls.primaryDimColor = theme_colors.primary_dim_color
+
+        if theme_colors.primary_container_color:
+            self.theme_cls.primaryContainerColor = theme_colors.primary_container_color
+
+        if theme_colors.on_primary_color:
+            self.theme_cls.onPrimaryColor = theme_colors.on_primary_color
+
+        if theme_colors.on_primary_container_color:
+            self.theme_cls.onPrimaryContainerColor = theme_colors.on_primary_container_color
+
+        # self.theme_cls.primaryFixedColor = theme_colors.primary_fixed_color
+        # self.theme_cls.primaryFixedDimColor = theme_colors.primary_fixed_dim_color
+        # self.theme_cls.onPrimaryFixedColor = theme_colors.on_primary_fixed_color
+        # self.theme_cls.onPrimaryFixedVariantColor = theme_colors.on_primary_fixed_variant_color
+
+        if theme_colors.secondary_color:
+            self.theme_cls.secondaryColor = theme_colors.secondary_color
+
+        # self.theme_cls.secondaryDimColor = theme_colors.secondary_dim_color
+
+        if theme_colors.secondary_container_color:
+            self.theme_cls.secondaryContainerColor = theme_colors.secondary_container_color
+
+        if theme_colors.on_secondary_color:
+            self.theme_cls.onSecondaryColor = theme_colors.on_secondary_color
+
+        if theme_colors.on_secondary_container_color:
+            self.theme_cls.onSecondaryContainerColor = theme_colors.on_secondary_container_color
+
+        # self.theme_cls.secondaryFixedColor = theme_colors.secondary_fixed_color
+        # self.theme_cls.secondaryFixedDimColor = theme_colors.secondary_fixed_dim_color
+        # self.theme_cls.onSecondaryFixedColor = theme_colors.on_secondary_fixed_color
+        # self.theme_cls.onSecondaryFixedVariantColor = theme_colors.on_secondary_fixed_variant_color
+
+        if theme_colors.tertiary_color:
+            self.theme_cls.tertiaryColor = theme_colors.tertiary_color
+
+        # self.theme_cls.tertiaryDimColor = theme_colors.tertiary_dim_color
+
+        if theme_colors.tertiary_container_color:
+            self.theme_cls.tertiaryContainerColor = theme_colors.tertiary_container_color
+
+        if theme_colors.on_tertiary_color:
+            self.theme_cls.onTertiaryColor = theme_colors.on_tertiary_color
+
+        if theme_colors.on_tertiary_container_color:
+            self.theme_cls.onTertiaryContainerColor = theme_colors.on_tertiary_container_color
+
+        # self.theme_cls.tertiaryFixedColor = theme_colors.tertiary_fixed_color
+        # self.theme_cls.tertiaryFixedDimColor = theme_colors.tertiary_fixed_dim_color
+        # self.theme_cls.ontertiaryFixedColor = theme_colors.on_tertiary_fixed_color
+        # self.theme_cls.ontertiaryFixedVariantColor = theme_colors.on_tertiary_fixed_variant_color
+
+        if theme_colors.surface_color:
+            self.theme_cls.surfaceColor = theme_colors.surface_color
+
+        if theme_colors.surface_dim_color:
+            self.theme_cls.surfaceDimColor = theme_colors.surface_dim_color
+
+        if theme_colors.surface_bright_color:
+            self.theme_cls.surfaceBrightColor = theme_colors.surface_bright_color
+
+        if theme_colors.surface_container_lowest_color:
+            self.theme_cls.surfaceContainerLowestColor = theme_colors.surface_container_lowest_color
+
+        if theme_colors.surface_container_low_color:
+            self.theme_cls.surfaceContainerLowColor = theme_colors.surface_container_low_color
+
+        if theme_colors.surface_container_high_color:
+            self.theme_cls.surfaceContainerHighColor = theme_colors.surface_container_high_color
+
+        if theme_colors.surface_container_highest_color:
+            self.theme_cls.surfaceContainerHighestColor = theme_colors.surface_container_highest_color
+
+        if theme_colors.surface_variant_color:
+            self.theme_cls.surfaceVariantColor = theme_colors.surface_variant_color
+
+        if theme_colors.surface_tint_color:
+            self.theme_cls.surfaceTintColor = theme_colors.surface_tint_color
+
+        if theme_colors.on_surface_color:
+            self.theme_cls.onSurfaceColor = theme_colors.on_surface_color
+
+        # self.theme_cls.onSurfaceLightColor = theme_colors.on_surface_light_color
+
+        if theme_colors.on_surface_variant_color:
+            self.theme_cls.onSurfaceVariantColor = theme_colors.on_surface_variant_color
+
+        if theme_colors.inverse_surface_color:
+            self.theme_cls.inverseSurfaceColor = theme_colors.inverse_surface_color
+
+        if theme_colors.inverse_on_surface_color:
+            self.theme_cls.inverseOnSurfaceColor = theme_colors.inverse_on_surface_color
+
+        if theme_colors.inverse_primary_color:
+            self.theme_cls.inversePrimaryColor = theme_colors.inverse_primary_color
+
+        if theme_colors.background_color:
+            self.theme_cls.backgroundColor = theme_colors.background_color
+
+        if theme_colors.on_background_color:
+            self.theme_cls.onBackgroundColor = theme_colors.on_background_color
+
+        if theme_colors.error_color:
+            self.theme_cls.errorColor = theme_colors.error_color
+
+        # self.theme_cls.errorDimColor = theme_colors.error_dim_color
+
+        if theme_colors.error_container_color:
+            self.theme_cls.errorContainerColor = theme_colors.error_container_color
+
+        if theme_colors.on_error_color:
+            self.theme_cls.onErrorColor = theme_colors.on_error_color
+
+        if theme_colors.on_error_container_color:
+            self.theme_cls.onErrorContainerColor = theme_colors.on_error_container_color
+
+        if theme_colors.outline_color:
+            self.theme_cls.outlineColor = theme_colors.outline_color
+
+        if theme_colors.outline_variant_color:
+            self.theme_cls.outlineVariantColor = theme_colors.outline_variant_color
+
+        if theme_colors.shadow_color:
+            self.theme_cls.shadowColor = theme_colors.shadow_color
+
+        if theme_colors.scrim_color:
+            self.theme_cls.scrimColor = theme_colors.scrim_color
+
+        # self.theme_cls.primaryPaletteKeyColorColor = theme_colors.primary_palette_key_color_color
+        # self.theme_cls.secondaryPaletteKeyColorColor = theme_colors.secondary_palette_key_color_color
+        # self.theme_cls.tertiaryPaletteKeyColorColor = theme_colors.tertiary_palette_key_color_color
+        # self.theme_cls.neutralPaletteKeyColorColor = theme_colors.neutral_palette_key_color_color
+        # self.theme_cls.neutralVariantPaletteKeyColorColor = theme_colors.neutral_variant_palette_key_color_color
+        # self.theme_cls.errorPaletteKeyColorColor = theme_colors.error_palette_key_color_color
 
 
 class ImageIcon(MDButtonIcon, AsyncImage):
@@ -164,7 +314,7 @@ class ScrollBox(MDScrollView):
 # thanks kivymd
 class ToggleButton(MDButton, ToggleButtonBehavior):
     def __init__(self, *args, **kwargs):
-        super(ToggleButton, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.bind(state=self._update_bg)
         self._update_bg(self, self.state)
 
@@ -200,12 +350,13 @@ class ResizableTextField(MDTextField):
     Resizable MDTextField that manually overrides the builtin sizing.
     Note that in order to use this, the sizing must be specified from within a .kv rule.
     """
+
     def __init__(self, *args, **kwargs):
         # cursed rules override
         rules = Builder.match(self)
-        textfield = next((rule for rule in rules if rule.name == f"<MDTextField>"), None)
+        textfield = next((rule for rule in rules if rule.name == "<MDTextField>"), None)
         if textfield:
-            subclasses = rules[rules.index(textfield) + 1:]
+            subclasses = rules[rules.index(textfield) + 1 :]
             for subclass in subclasses:
                 height_rule = subclass.properties.get("height", None)
                 if height_rule:
@@ -222,8 +373,9 @@ MDButton.on_release = on_release
 
 
 # I was surprised to find this didn't already exist in kivy :(
-class HoverBehavior(object):
+class HoverBehavior:
     """originally from https://stackoverflow.com/a/605348110"""
+
     hovered = BooleanProperty(False)
     border_point = ObjectProperty(None)
 
@@ -232,7 +384,7 @@ class HoverBehavior(object):
         self.register_event_type("on_leave")
         Window.bind(mouse_pos=self.on_mouse_pos)
         Window.bind(on_cursor_leave=self.on_cursor_leave)
-        super(HoverBehavior, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def on_mouse_pos(self, window, pos):
         if not self.get_root_window():
@@ -300,7 +452,6 @@ class TooltipLabel(HovererableLabel, MDTooltip):
             return
         super().on_mouse_pos(window, pos)
         if self.refs and self.hovered:
-
             tx, ty = self.to_widget(*pos, relative=True)
             # Why TF is Y flipped *within* the texture?
             ty = self.texture_size[1] - ty
@@ -330,8 +481,7 @@ class ServerLabel(HoverBehavior, MDTooltip, MDBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.add_widget(MDIcon(icon="information", font_size=sp(15)))
-        self.add_widget(TooltipLabel(text=self.text, pos_hint={"center_x": 0.5, "center_y": 0.5},
-                                     font_size=sp(15)))
+        self.add_widget(TooltipLabel(text=self.text, pos_hint={"center_x": 0.5, "center_y": 0.5}, font_size=sp(15)))
         self._tooltip = ServerToolTip(text="Test")
 
     def on_enter(self):
@@ -350,38 +500,45 @@ class ServerLabel(HoverBehavior, MDTooltip, MDBoxLayout):
             ctx = self.ctx
             text = f"Connected to: {ctx.server_address}."
             if ctx.slot is not None:
-                text += f"\nYou are Slot Number {ctx.slot} in Team Number {ctx.team}, " \
-                        f"named {ctx.player_names[ctx.slot]}."
+                text += (
+                    f"\nYou are Slot Number {ctx.slot} in Team Number {ctx.team}, named {ctx.player_names[ctx.slot]}."
+                )
                 if ctx.items_received:
-                    text += f"\nYou have received {len(ctx.items_received)} items. " \
-                            f"You can list them in order with /received."
+                    text += (
+                        f"\nYou have received {len(ctx.items_received)} items. "
+                        f"You can list them in order with /received."
+                    )
                 if ctx.total_locations:
-                    text += f"\nYou have checked {len(ctx.checked_locations)} " \
-                            f"out of {ctx.total_locations} locations. " \
-                            f"You can get more info on missing checks with /missing."
+                    text += (
+                        f"\nYou have checked {len(ctx.checked_locations)} "
+                        f"out of {ctx.total_locations} locations. "
+                        f"You can get more info on missing checks with /missing."
+                    )
                 if ctx.permissions:
                     text += "\nPermissions:"
                     for permission_name, permission_data in ctx.permissions.items():
                         text += f"\n    {permission_name}: {permission_data}"
                 if ctx.hint_cost is not None and ctx.total_locations:
                     min_cost = int(ctx.server_version >= (0, 3, 9))
-                    text += f"\nA new !hint <itemname> costs {ctx.hint_cost}% of checks made. " \
-                            f"For you this means every " \
-                            f"{max(min_cost, int(ctx.hint_cost * 0.01 * ctx.total_locations))} " \
-                            "location checks." \
-                            f"\nYou currently have {ctx.hint_points} points."
+                    text += (
+                        f"\nA new !hint <itemname> costs {ctx.hint_cost}% of checks made. "
+                        f"For you this means every "
+                        f"{max(min_cost, int(ctx.hint_cost * 0.01 * ctx.total_locations))} "
+                        "location checks."
+                        f"\nYou currently have {ctx.hint_points} points."
+                    )
                 elif ctx.hint_cost == 0:
                     text += "\n!hint is free to use."
                 if ctx.stored_data and "_read_race_mode" in ctx.stored_data:
-                    text += "\nRace mode is enabled." \
-                        if ctx.stored_data["_read_race_mode"] else "\nRace mode is disabled."
+                    text += (
+                        "\nRace mode is enabled." if ctx.stored_data["_read_race_mode"] else "\nRace mode is disabled."
+                    )
             else:
-                text += f"\nYou are not authenticated yet."
+                text += "\nYou are not authenticated yet."
 
             return text
 
-        else:
-            return "No current server connection. \nPlease connect to an Archipelago server."
+        return "No current server connection. \nPlease connect to an Archipelago server."
 
 
 class MainLayout(MDGridLayout):
@@ -392,21 +549,20 @@ class ContainerLayout(MDFloatLayout):
     pass
 
 
-class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
-                                 RecycleBoxLayout):
-    """ Adds selection and focus behaviour to the view. """
+class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior, RecycleBoxLayout):
+    """Adds selection and focus behaviour to the view."""
 
 
 class SelectableLabel(RecycleDataViewBehavior, TooltipLabel):
-    """ Add selection support to the Label """
+    """Add selection support to the Label"""
+
     index = None
     selected = BooleanProperty(False)
 
     def refresh_view_attrs(self, rv, index, data):
-        """ Catch and handle the view changes """
+        """Catch and handle the view changes"""
         self.index = index
-        return super(SelectableLabel, self).refresh_view_attrs(
-            rv, index, data)
+        return super().refresh_view_attrs(rv, index, data)
 
     def on_size(self, instance_label, size: list) -> None:
         super().on_size(instance_label, size)
@@ -414,8 +570,8 @@ class SelectableLabel(RecycleDataViewBehavior, TooltipLabel):
             self.width = self.parent.width
 
     def on_touch_down(self, touch):
-        """ Add selection on touch down """
-        if super(SelectableLabel, self).on_touch_down(touch):
+        """Add selection on touch down"""
+        if super().on_touch_down(touch):
             return True
         if self.collide_point(*touch.pos):
             if self.selected:
@@ -434,7 +590,7 @@ class SelectableLabel(RecycleDataViewBehavior, TooltipLabel):
                 return self.parent.select_with_touch(self.index, touch)
 
     def apply_selection(self, rv, index, is_selected):
-        """ Respond to the selection of items in the view. """
+        """Respond to the selection of items in the view."""
         self.selected = is_selected
 
 
@@ -444,6 +600,7 @@ class MarkupDropdownTextItem(MDDropdownTextItem):
         for child in self.children:
             if child.__class__ == MDLabel:
                 child.markup = True
+
     # Currently, this only lets us do markup on text that does not have any icons
     # Create new TextItems as needed
 
@@ -459,53 +616,21 @@ class MarkupDropdown(MDDropdownMenu):
 
         for data in value:
             if "viewclass" not in data:
-                if (
-                    "leading_icon" not in data
-                    and "trailing_icon" not in data
-                    and "trailing_text" not in data
-                ):
+                if "leading_icon" not in data and "trailing_icon" not in data and "trailing_text" not in data:
                     viewclass = "MarkupDropdownTextItem"
-                elif (
-                    "leading_icon" in data
-                    and "trailing_icon" not in data
-                    and "trailing_text" not in data
-                ):
+                elif "leading_icon" in data and "trailing_icon" not in data and "trailing_text" not in data:
                     viewclass = "MDDropdownLeadingIconItem"
-                elif (
-                    "leading_icon" not in data
-                    and "trailing_icon" in data
-                    and "trailing_text" not in data
-                ):
+                elif "leading_icon" not in data and "trailing_icon" in data and "trailing_text" not in data:
                     viewclass = "MDDropdownTrailingIconItem"
-                elif (
-                    "leading_icon" not in data
-                    and "trailing_icon" in data
-                    and "trailing_text" in data
-                ):
+                elif "leading_icon" not in data and "trailing_icon" in data and "trailing_text" in data:
                     viewclass = "MDDropdownTrailingIconTextItem"
-                elif (
-                    "leading_icon" in data
-                    and "trailing_icon" in data
-                    and "trailing_text" in data
-                ):
+                elif "leading_icon" in data and "trailing_icon" in data and "trailing_text" in data:
                     viewclass = "MDDropdownLeadingTrailingIconTextItem"
-                elif (
-                    "leading_icon" in data
-                    and "trailing_icon" in data
-                    and "trailing_text" not in data
-                ):
+                elif "leading_icon" in data and "trailing_icon" in data and "trailing_text" not in data:
                     viewclass = "MDDropdownLeadingTrailingIconItem"
-                elif (
-                    "leading_icon" not in data
-                    and "trailing_icon" not in data
-                    and "trailing_text" in data
-                ):
+                elif "leading_icon" not in data and "trailing_icon" not in data and "trailing_text" in data:
                     viewclass = "MDDropdownTrailingTextItem"
-                elif (
-                    "leading_icon" in data
-                    and "trailing_icon" not in data
-                    and "trailing_text" in data
-                ):
+                elif "leading_icon" in data and "trailing_icon" not in data and "trailing_text" in data:
                     viewclass = "MDDropdownLeadingIconTrailingTextItem"
 
                 data["viewclass"] = viewclass
@@ -532,7 +657,7 @@ class AutocompleteHintInput(ResizableTextField):
         self.bind(width=lambda instance, x: setattr(self.dropdown, "width", x))
 
     def on_message(self, instance):
-        MDApp.get_running_app().commandprocessor("!hint "+instance.text)
+        MDApp.get_running_app().commandprocessor("!hint " + instance.text)
 
     def on_text(self, instance, value):
         if len(value) >= self.min_chars:
@@ -544,8 +669,7 @@ class AutocompleteHintInput(ResizableTextField):
 
             def on_press(text):
                 split_text = MarkupLabel(text=text).markup
-                self.set_text(self, "".join(text_frag for text_frag in split_text
-                                            if not text_frag.startswith("[")))
+                self.set_text(self, "".join(text_frag for text_frag in split_text if not text_frag.startswith("[")))
                 self.dropdown.dismiss()
                 self.focus = True
 
@@ -557,12 +681,10 @@ class AutocompleteHintInput(ResizableTextField):
                     pass  # substring not found
                 else:
                     text = escape_markup(item_name)
-                    text = text[:index] + "[b]" + text[index:index+len(value)]+"[/b]"+text[index+len(value):]
-                    self.dropdown.items.append({
-                        "text": text,
-                        "on_release": lambda txt=text: on_press(txt),
-                        "markup": True
-                    })
+                    text = text[:index] + "[b]" + text[index : index + len(value)] + "[/b]" + text[index + len(value) :]
+                    self.dropdown.items.append(
+                        {"text": text, "on_release": lambda txt=text: on_press(txt), "markup": True}
+                    )
             if not self.dropdown.parent:
                 self.dropdown.open()
         else:
@@ -572,7 +694,7 @@ class AutocompleteHintInput(ResizableTextField):
 status_icons = {
     HintStatus.HINT_NO_PRIORITY: "information",
     HintStatus.HINT_PRIORITY: "exclamation-thick",
-    HintStatus.HINT_AVOID: "alert"
+    HintStatus.HINT_AVOID: "alert",
 }
 
 
@@ -583,7 +705,7 @@ class HintLabel(RecycleDataViewBehavior, MDBoxLayout):
     dropdown: MDDropdownMenu
 
     def __init__(self):
-        super(HintLabel, self).__init__()
+        super().__init__()
         self.receiving_text = ""
         self.item_text = ""
         self.finding_text = ""
@@ -599,18 +721,14 @@ class HintLabel(RecycleDataViewBehavior, MDBoxLayout):
             name = status_names[status]
             status_button = MDDropDownItem(MDDropDownItemText(text=name), size_hint_y=None, height=dp(50))
             status_button.status = status
-            menu_items.append({
-                "text": name,
-                "leading_icon": status_icons[status],
-                "on_release": lambda x=status: select(self, x)
-            })
+            menu_items.append(
+                {"text": name, "leading_icon": status_icons[status], "on_release": lambda x=status: select(self, x)}
+            )
 
         self.dropdown = MDDropdownMenu(caller=self.ids["status"], items=menu_items)
 
         def select(instance, data):
-            ctx.update_hint(self.hint["location"],
-                            self.hint["finding_player"],
-                            data)
+            ctx.update_hint(self.hint["location"], self.hint["finding_player"], data)
 
         self.dropdown.bind(on_release=self.dropdown.dismiss)
 
@@ -627,18 +745,18 @@ class HintLabel(RecycleDataViewBehavior, MDBoxLayout):
         self.entrance_text = data["entrance"]["text"]
         self.status_text = data["status"]["text"]
         self.hint = data["status"]["hint"]
-        return super(HintLabel, self).refresh_view_attrs(rv, index, data)
+        return super().refresh_view_attrs(rv, index, data)
 
     def on_touch_down(self, touch):
-        """ Add selection on touch down """
-        if super(HintLabel, self).on_touch_down(touch):
+        """Add selection on touch down"""
+        if super().on_touch_down(touch):
             return True
         if self.index:  # skip header
             if self.collide_point(*touch.pos):
                 status_label = self.ids["status"]
                 if status_label.collide_point(*touch.pos):
                     if self.hint["status"] == HintStatus.HINT_FOUND:
-                        return
+                        return None
                     ctx = MDApp.get_running_app().ctx
                     if ctx.slot_concerns_self(self.hint["receiving_player"]):  # If this player owns this hint
                         # open a dropdown
@@ -646,10 +764,22 @@ class HintLabel(RecycleDataViewBehavior, MDBoxLayout):
                 elif self.selected:
                     self.parent.clear_selection()
                 else:
-                    text = "".join((self.receiving_text, "\'s ", self.item_text, " is at ", self.location_text, " in ",
-                                    self.finding_text, "\'s World", (" at " + self.entrance_text)
-                                    if self.entrance_text != "Vanilla"
-                                    else "", ". (", self.status_text.lower(), ")"))
+                    text = "".join(
+                        (
+                            self.receiving_text,
+                            "'s ",
+                            self.item_text,
+                            " is at ",
+                            self.location_text,
+                            " in ",
+                            self.finding_text,
+                            "'s World",
+                            (" at " + self.entrance_text) if self.entrance_text != "Vanilla" else "",
+                            ". (",
+                            self.status_text.lower(),
+                            ")",
+                        )
+                    )
                     temp = MarkupLabel(text).markup
                     text = "".join(part for part in temp if not part.startswith("["))
                     Clipboard.copy(escape_markup(text).replace("&amp;", "&").replace("&bl;", "[").replace("&br;", "]"))
@@ -665,9 +795,9 @@ class HintLabel(RecycleDataViewBehavior, MDBoxLayout):
                     if key == "status":
                         parent.hint_sorter = lambda element: status_sort_weights[element["status"]["hint"]["status"]]
                     else:
-                        parent.hint_sorter = lambda element: (
-                            remove_between_brackets.sub("", element[key]["text"]).lower()
-                        )
+                        parent.hint_sorter = lambda element: remove_between_brackets.sub(
+                            "", element[key]["text"]
+                        ).lower()
                     if key == parent.sort_key:
                         # second click reverses order
                         parent.reversed = not parent.reversed
@@ -677,7 +807,7 @@ class HintLabel(RecycleDataViewBehavior, MDBoxLayout):
                     MDApp.get_running_app().update_hints()
 
     def apply_selection(self, rv, index, is_selected):
-        """ Respond to the selection of items in the view. """
+        """Respond to the selection of items in the view."""
         if self.index:
             self.selected = is_selected
 
@@ -685,7 +815,7 @@ class HintLabel(RecycleDataViewBehavior, MDBoxLayout):
 class ConnectBarTextInput(ResizableTextField):
     def insert_text(self, substring, from_undo=False):
         s = substring.replace("\n", "").replace("\r", "")
-        return super(ConnectBarTextInput, self).insert_text(s, from_undo=from_undo)
+        return super().insert_text(s, from_undo=from_undo)
 
 
 def is_command_input(string: str) -> bool:
@@ -698,20 +828,14 @@ class CommandPromptTextInput(ResizableTextField):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._command_history_index = -1
-        self._command_history: typing.Deque[str] = deque(maxlen=CommandPromptTextInput.MAXIMUM_HISTORY_MESSAGES)
+        self._command_history: deque[str] = deque(maxlen=CommandPromptTextInput.MAXIMUM_HISTORY_MESSAGES)
 
     def update_history(self, new_entry: str) -> None:
         self._command_history_index = -1
         if is_command_input(new_entry):
             self._command_history.appendleft(new_entry)
 
-    def keyboard_on_key_down(
-        self,
-        window,
-        keycode: typing.Tuple[int, str],
-        text: typing.Optional[str],
-        modifiers: typing.List[str]
-    ) -> bool:
+    def keyboard_on_key_down(self, window, keycode: tuple[int, str], text: str | None, modifiers: list[str]) -> bool:
         """
         :param window: The kivy window object
         :param keycode: A tuple of (keycode, keyname). Keynames are always lowercase
@@ -719,10 +843,10 @@ class CommandPromptTextInput(ResizableTextField):
                      Seems to pretty naively interpret the keycode as unicode, so numlock can return odd characters.
         :param modifiers: A list of string modifiers, like `ctrl` or `numlock`
         """
-        if keycode[1] == 'up':
+        if keycode[1] == "up":
             self._change_to_history_text_if_available(self._command_history_index + 1)
             return True
-        if keycode[1] == 'down':
+        if keycode[1] == "down":
             self._change_to_history_text_if_available(self._command_history_index - 1)
             return True
         return super().keyboard_on_key_down(window, keycode, text, modifiers)
@@ -748,9 +872,15 @@ class MessageBoxLabel(MDLabel):
 class MessageBox(Popup):
     def __init__(self, title, text, error=False, **kwargs):
         label = MessageBoxLabel(text=text, padding=("6dp", "0dp"))
-        separator_color = [217 / 255, 129 / 255, 122 / 255, 1.] if error else [47 / 255., 167 / 255., 212 / 255, 1.]
-        super().__init__(title=title, content=label, size_hint=(0.5, None), width=max(100, int(label.width) + 40),
-                         separator_color=separator_color, **kwargs)
+        separator_color = [217 / 255, 129 / 255, 122 / 255, 1.0] if error else [47 / 255.0, 167 / 255.0, 212 / 255, 1.0]
+        super().__init__(
+            title=title,
+            content=label,
+            size_hint=(0.5, None),
+            width=max(100, int(label.width) + 40),
+            separator_color=separator_color,
+            **kwargs,
+        )
 
 
 class MDNavigationItemBase(MDNavigationItem):
@@ -758,8 +888,7 @@ class MDNavigationItemBase(MDNavigationItem):
 
 
 class ButtonsPrompt(MDDialog):
-    def __init__(self, title: str, text: str, response: typing.Callable[[str], None],
-                 *prompts: str, **kwargs) -> None:
+    def __init__(self, title: str, text: str, response: typing.Callable[[str], None], *prompts: str, **kwargs) -> None:
         """
         Customizable popup box that lets you create any number of buttons. The text of the pressed button is returned to
         the callback.
@@ -861,7 +990,7 @@ class GameManager(ThemedApp):
         self.commandprocessor = ctx.command_processor(ctx)
         self.icon = r"data/icon.png"
         self.json_to_kivy_parser = KivyJSONtoTextParser(ctx)
-        self.log_panels: typing.Dict[str, Widget] = {}
+        self.log_panels: dict[str, Widget] = {}
 
         # keep track of last used command to autofill on click
         self.last_autofillable_command = "!hint"
@@ -879,7 +1008,7 @@ class GameManager(ThemedApp):
 
         ctx.on_user_say = intercept_say
 
-        super(GameManager, self).__init__()
+        super().__init__()
 
     @property
     def tab_count(self):
@@ -890,6 +1019,7 @@ class GameManager(ThemedApp):
     def on_start(self):
         def on_start(*args):
             self.root.md_bg_color = self.theme_cls.backgroundColor
+
         super().on_start()
         Clock.schedule_once(on_start)
 
@@ -899,13 +1029,15 @@ class GameManager(ThemedApp):
 
         self.grid = MainLayout()
         self.grid.cols = 1
-        self.connect_layout = MDBoxLayout(orientation="horizontal", size_hint_y=None, height=dp(40),
-                                          spacing=5, padding=(5, 10))
+        self.connect_layout = MDBoxLayout(
+            orientation="horizontal", size_hint_y=None, height=dp(40), spacing=5, padding=(5, 10)
+        )
         # top part
         server_label = ServerLabel(width=dp(75))
         self.connect_layout.add_widget(server_label)
-        self.server_connect_bar = ConnectBarTextInput(text=self.ctx.suggested_address or "archipelago.gg:",
-                                                      pos_hint={"center_x": 0.5, "center_y": 0.5})
+        self.server_connect_bar = ConnectBarTextInput(
+            text=self.ctx.suggested_address or "archipelago.gg:", pos_hint={"center_x": 0.5, "center_y": 0.5}
+        )
 
         def connect_bar_validate(sender):
             if not self.ctx.server:
@@ -914,8 +1046,15 @@ class GameManager(ThemedApp):
         self.server_connect_bar.height = dp(30)
         self.server_connect_bar.bind(on_text_validate=connect_bar_validate)
         self.connect_layout.add_widget(self.server_connect_bar)
-        self.server_connect_button = MDButton(MDButtonText(text="Connect"), style="filled", size=(dp(100), dp(70)),
-                                              size_hint_x=None, size_hint_y=None, radius=5, pos_hint={"center_y": 0.55})
+        self.server_connect_button = MDButton(
+            MDButtonText(text="Connect"),
+            style="filled",
+            size=(dp(100), dp(70)),
+            size_hint_x=None,
+            size_hint_y=None,
+            radius=5,
+            pos_hint={"center_y": 0.55},
+        )
         self.server_connect_button.bind(on_press=self.connect_button_action)
         self.server_connect_button.height = self.server_connect_bar.height
         self.connect_layout.add_widget(self.server_connect_button)
@@ -954,10 +1093,19 @@ class GameManager(ThemedApp):
         self.grid.add_widget(self.main_area_container)
 
         # bottom part
-        bottom_layout = MDBoxLayout(orientation="horizontal", size_hint_y=None, height=dp(40), spacing=5, padding=(5, 10))
-        info_button = CommandButton(MDButtonText(text="Command:", halign="left"), manager=self, radius=5,
-                                    style="filled", size=(dp(100), dp(70)), size_hint_x=None, size_hint_y=None,
-                                    pos_hint={"center_y": 0.575})
+        bottom_layout = MDBoxLayout(
+            orientation="horizontal", size_hint_y=None, height=dp(40), spacing=5, padding=(5, 10)
+        )
+        info_button = CommandButton(
+            MDButtonText(text="Command:", halign="left"),
+            manager=self,
+            radius=5,
+            style="filled",
+            size=(dp(100), dp(70)),
+            size_hint_x=None,
+            size_hint_y=None,
+            pos_hint={"center_y": 0.575},
+        )
         info_button.bind(on_release=self.command_button_action)
         bottom_layout.add_widget(info_button)
         self.textinput = CommandPromptTextInput(size_hint_y=None, multiline=False, write_tab=False)
@@ -1040,11 +1188,12 @@ class GameManager(ThemedApp):
 
     def update_texts(self, dt):
         if hasattr(self.screens.current_tab.content, "fix_heights"):
-            getattr(self.screens.current_tab.content, "fix_heights")()
+            self.screens.current_tab.content.fix_heights()
         if self.ctx.server:
-            self.title = self.base_title + " " + Utils.__version__ + \
-                         f" | Connected to: {self.ctx.server_address} " \
-                         f"{'.'.join(str(e) for e in self.ctx.server_version)}"
+            self.title = (
+                self.base_title + " " + Utils.__version__ + f" | Connected to: {self.ctx.server_address} "
+                f"{'.'.join(str(e) for e in self.ctx.server_version)}"
+            )
             self.server_connect_button._button_text.text = "Disconnect"
             self.server_connect_bar.readonly = True
             self.progressbar.max = len(self.ctx.checked_locations) + len(self.ctx.missing_locations)
@@ -1059,8 +1208,9 @@ class GameManager(ThemedApp):
         if self.ctx.server:
             logging.getLogger("Client").info("/help for client commands and !help for server commands.")
         else:
-            logging.getLogger("Client").info("/help for client commands and once you are connected, "
-                                             "!help for server commands.")
+            logging.getLogger("Client").info(
+                "/help for client commands and once you are connected, !help for server commands."
+            )
 
     def connect_button_action(self, button):
         self.ctx.username = None
@@ -1096,7 +1246,7 @@ class GameManager(ThemedApp):
         except Exception as e:
             logging.getLogger("Client").exception(e)
 
-    def print_json(self, data: typing.List[JSONMessagePart]):
+    def print_json(self, data: list[JSONMessagePart]):
         text = self.json_to_kivy_parser(data)
         self.log_panels["Archipelago"].on_message_markup(text)
         self.log_panels["All"].on_message_markup(text)
@@ -1113,8 +1263,7 @@ class GameManager(ThemedApp):
 
     def enable_energy_link(self):
         if not hasattr(self, "energy_link_label"):
-            self.energy_link_label = MDLabel(text="Energy Link: Standby",
-                                           size_hint_x=None, width=150, halign="center")
+            self.energy_link_label = MDLabel(text="Energy Link: Standby", size_hint_x=None, width=150, halign="center")
             self.connect_layout.add_widget(self.energy_link_label)
 
     def set_new_energy_link_value(self):
@@ -1128,7 +1277,7 @@ class GameManager(ThemedApp):
 
 class LogtoUI(logging.Handler):
     def __init__(self, on_log):
-        super(LogtoUI, self).__init__(logging.INFO)
+        super().__init__(logging.INFO)
         self.on_log = on_log
 
     @staticmethod
@@ -1151,7 +1300,7 @@ class UILog(MDRecycleView):
     adaptive_height = True
 
     def __init__(self, *loggers_to_handle, **kwargs):
-        super(UILog, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.data = []
         for logger in loggers_to_handle:
             logger.addHandler(LogtoUI(self.on_log))
@@ -1181,8 +1330,17 @@ class HintLayout(MDBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         boxlayout = MDBoxLayout(orientation="horizontal", size_hint_y=None, height=dp(40))
-        boxlayout.add_widget(MDLabel(text="New Hint:", size_hint_x=None, size_hint_y=None,
-                                     height=dp(40), width=dp(75), halign="center", valign="center"))
+        boxlayout.add_widget(
+            MDLabel(
+                text="New Hint:",
+                size_hint_x=None,
+                size_hint_y=None,
+                height=dp(40),
+                width=dp(75),
+                halign="center",
+                valign="center",
+            )
+        )
         boxlayout.add_widget(AutocompleteHintInput())
         self.add_widget(boxlayout)
 
@@ -1193,14 +1351,14 @@ class HintLayout(MDBoxLayout):
                 fix_func()
 
 
-status_names: typing.Dict[HintStatus, str] = {
+status_names: dict[HintStatus, str] = {
     HintStatus.HINT_FOUND: "Found",
     HintStatus.HINT_UNSPECIFIED: "Unspecified",
     HintStatus.HINT_NO_PRIORITY: "No Priority",
     HintStatus.HINT_AVOID: "Avoid",
     HintStatus.HINT_PRIORITY: "Priority",
 }
-status_colors: typing.Dict[HintStatus, str] = {
+status_colors: dict[HintStatus, str] = {
     HintStatus.HINT_FOUND: "green",
     HintStatus.HINT_UNSPECIFIED: "white",
     HintStatus.HINT_NO_PRIORITY: "cyan",
@@ -1215,6 +1373,7 @@ status_sort_weights: dict[HintStatus, int] = {
     HintStatus.HINT_PRIORITY: 4,
 }
 
+
 class HintLog(MDRecycleView):
     header = {
         "receiving": {"text": "[u]Receiving Player[/u]"},
@@ -1222,8 +1381,10 @@ class HintLog(MDRecycleView):
         "finding": {"text": "[u]Finding Player[/u]"},
         "location": {"text": "[u]Location[/u]"},
         "entrance": {"text": "[u]Entrance[/u]"},
-        "status": {"text": "[u]Status[/u]",
-                   "hint": {"receiving_player": -1, "location": -1, "finding_player": -1, "status": ""}},
+        "status": {
+            "text": "[u]Status[/u]",
+            "hint": {"receiving_player": -1, "location": -1, "finding_player": -1, "status": ""},
+        },
         "striped": True,
     }
     data: list[typing.Any]
@@ -1231,7 +1392,7 @@ class HintLog(MDRecycleView):
     reversed: bool = True
 
     def __init__(self, parser):
-        super(HintLog, self).__init__()
+        super().__init__()
         self.data = [self.header]
         self.parser = parser
 
@@ -1241,35 +1402,57 @@ class HintLog(MDRecycleView):
         data = []
         ctx = MDApp.get_running_app().ctx
         for hint in hints:
-            if not hint.get("status"): # Allows connecting to old servers
+            if not hint.get("status"):  # Allows connecting to old servers
                 hint["status"] = HintStatus.HINT_FOUND if hint["found"] else HintStatus.HINT_UNSPECIFIED
-            hint_status_node = self.parser.handle_node({"type": "color",
-                                                        "color": status_colors.get(hint["status"], "red"),
-                                                        "text": status_names.get(hint["status"], "Unknown")})
+            hint_status_node = self.parser.handle_node(
+                {
+                    "type": "color",
+                    "color": status_colors.get(hint["status"], "red"),
+                    "text": status_names.get(hint["status"], "Unknown"),
+                }
+            )
             if hint["status"] != HintStatus.HINT_FOUND and ctx.slot_concerns_self(hint["receiving_player"]):
                 hint_status_node = f"[u]{hint_status_node}[/u]"
-            data.append({
-                "receiving": {"text": self.parser.handle_node({"type": "player_id", "text": hint["receiving_player"]})},
-                "item": {"text": self.parser.handle_node({
-                    "type": "item_id",
-                    "text": hint["item"],
-                    "flags": hint["item_flags"],
-                    "player": hint["receiving_player"],
-                })},
-                "finding": {"text": self.parser.handle_node({"type": "player_id", "text": hint["finding_player"]})},
-                "location": {"text": self.parser.handle_node({
-                    "type": "location_id",
-                    "text": hint["location"],
-                    "player": hint["finding_player"],
-                })},
-                "entrance": {"text": self.parser.handle_node({"type": "color" if hint["entrance"] else "text",
-                                                              "color": "blue", "text": hint["entrance"]
-                                                              if hint["entrance"] else "Vanilla"})},
-                "status": {
-                    "text": hint_status_node,
-                    "hint": hint,
-                },
-            })
+            data.append(
+                {
+                    "receiving": {
+                        "text": self.parser.handle_node({"type": "player_id", "text": hint["receiving_player"]})
+                    },
+                    "item": {
+                        "text": self.parser.handle_node(
+                            {
+                                "type": "item_id",
+                                "text": hint["item"],
+                                "flags": hint["item_flags"],
+                                "player": hint["receiving_player"],
+                            }
+                        )
+                    },
+                    "finding": {"text": self.parser.handle_node({"type": "player_id", "text": hint["finding_player"]})},
+                    "location": {
+                        "text": self.parser.handle_node(
+                            {
+                                "type": "location_id",
+                                "text": hint["location"],
+                                "player": hint["finding_player"],
+                            }
+                        )
+                    },
+                    "entrance": {
+                        "text": self.parser.handle_node(
+                            {
+                                "type": "color" if hint["entrance"] else "text",
+                                "color": "blue",
+                                "text": hint["entrance"] if hint["entrance"] else "Vanilla",
+                            }
+                        )
+                    },
+                    "status": {
+                        "text": hint_status_node,
+                        "hint": hint,
+                    },
+                }
+            )
 
         data.sort(key=self.hint_sorter, reverse=self.reversed)
         for i in range(0, len(data), 2):
@@ -1289,23 +1472,21 @@ class HintLog(MDRecycleView):
 
 
 class ApAsyncImage(AsyncImage):
-
     def is_uri(self, filename: str) -> bool:
         if filename.startswith("ap:"):
             return True
-        else:
-            return super().is_uri(filename)
+        return super().is_uri(filename)
 
 
 class ImageLoaderPkgutil(ImageLoaderBase):
-    def load(self, filename: str) -> typing.List[ImageData]:
+    def load(self, filename: str) -> list[ImageData]:
         # take off the "ap:" prefix
         module, path = filename[3:].split("/", 1)
         data = pkgutil.get_data(module, path)
         return self._bytes_to_data(data)
 
     @staticmethod
-    def _bytes_to_data(data: typing.Union[bytes, bytearray]) -> typing.List[ImageData]:
+    def _bytes_to_data(data: bytes | bytearray) -> list[ImageData]:
         loader = next(loader for loader in ImageLoader.loaders if loader.can_load_memory())
         return loader.load(loader, io.BytesIO(data))
 
@@ -1317,8 +1498,7 @@ _original_image_loader_load = ImageLoader.load
 def load_override(filename: str, default_load=_original_image_loader_load, **kwargs):
     if filename.startswith("ap:"):
         return ImageLoaderPkgutil(filename)
-    else:
-        return default_load(filename, **kwargs)
+    return default_load(filename, **kwargs)
 
 
 ImageLoader.load = load_override
@@ -1347,6 +1527,7 @@ class KivyJSONtoTextParser(JSONtoTextParser):
         plum: str = StringProperty("AF99EF")
         salmon: str = StringProperty("FA8072")
         orange: str = StringProperty("FF7700")
+
         # KivyMD parameters
         theme_style: str = StringProperty("Dark")
         primary_palette: str = StringProperty("Lightsteelblue")
@@ -1364,7 +1545,7 @@ class KivyJSONtoTextParser(JSONtoTextParser):
 
     def __call__(self, *args, **kwargs):
         self.ref_count = 0
-        return super(KivyJSONtoTextParser, self).__call__(*args, **kwargs)
+        return super().__call__(*args, **kwargs)
 
     def _handle_item_name(self, node: JSONMessagePart):
         flags = node.get("flags", 0)
@@ -1379,21 +1560,19 @@ class KivyJSONtoTextParser(JSONtoTextParser):
             item_types.append("normal")
 
         node.setdefault("refs", []).append("Item Class: " + ", ".join(item_types))
-        return super(KivyJSONtoTextParser, self)._handle_item_name(node)
+        return super()._handle_item_name(node)
 
     def _handle_player_id(self, node: JSONMessagePart):
         player = int(node["text"])
         slot_info = self.ctx.slot_info.get(player, None)
         if slot_info:
-            text = f"Game: {slot_info.game}<br>" \
-                   f"Type: {SlotType(slot_info.type).name}"
+            text = f"Game: {slot_info.game}<br>Type: {SlotType(slot_info.type).name}"
             if slot_info.group_members:
-                text += f"<br>Members:<br> " + "<br> ".join(
-                    escape_markup(self.ctx.player_names[player])
-                    for player in slot_info.group_members
+                text += "<br>Members:<br> " + "<br> ".join(
+                    escape_markup(self.ctx.player_names[player]) for player in slot_info.group_members
                 )
             node.setdefault("refs", []).append(text)
-        return super(KivyJSONtoTextParser, self)._handle_player_id(node)
+        return super()._handle_player_id(node)
 
     def _handle_color(self, node: JSONMessagePart):
         colors = node["color"].split(";")
@@ -1413,7 +1592,94 @@ class KivyJSONtoTextParser(JSONtoTextParser):
         for ref in node.get("refs", []):
             node["text"] = f"[ref={self.ref_count}|{ref}]{node['text']}[/ref]"
             self.ref_count += 1
-        return super(KivyJSONtoTextParser, self)._handle_text(node)
+        return super()._handle_text(node)
+
+
+class MaterialYouOptionsParser:
+    def __init__(self):
+        self.set_opts()
+
+    def set_opts(self, opt_path: str = Utils.local_path("data", "theme.json")):
+        opts: dict = {}
+        try:
+            with open(opt_path, "r") as f:
+                opts = json.load(f)
+                f.close()
+        except FileNotFoundError:
+            logging.warning("MaterialYouOptionsParser: Could not find colors.json in the data folder.")
+            pass
+        except PermissionError:
+            logging.warning(
+                "MaterialYouOptionsParser: colors.json was found,"
+                "but could not be accessed. Please check your permissions."
+            )
+
+        # Wallpaper Options
+        self.use_wallpaper: bool = opts.get("use_wallpaper", False)
+        self.path_to_wallpaper: str | None = os.path.expanduser(opts.get("path_to_wallpaper", ""))
+
+        # Dynamic Colors
+        self.background_color: str | None = opts.get("background_color", None)
+        self.error_color: str | None = opts.get("error_color", None)
+        self.error_container_color: str | None = opts.get("error_container_color", None)
+        self.error_dim_color: str | None = opts.get("error_dim_color", None)
+        self.error_palette_key_color_color: str | None = opts.get("error_palette_key_color_color", None)
+        self.inverse_on_surface_color: str | None = opts.get("inverse_on_surface_color", None)
+        self.inverse_primary_color: str | None = opts.get("inverse_primary_color", None)
+        self.inverse_surface_color: str | None = opts.get("inverse_surface_color", None)
+        self.neutral_palette_key_color_color: str | None = opts.get("neutral_palette_key_color_color", None)
+        self.neutral_variant_palette_key_color_color: str | None = opts.get(
+            "neutral_variant_palette_key_color_color", None
+        )
+        self.on_background_color: str | None = opts.get("on_background_color", None)
+        self.on_error_color: str | None = opts.get("on_error_color", None)
+        self.on_error_container_color: str | None = opts.get("on_error_container_color", None)
+        self.on_primary_color: str | None = opts.get("on_primary_color", None)
+        self.on_primary_container_color: str | None = opts.get("on_primary_container_color", None)
+        self.on_primary_fixed_color: str | None = opts.get("on_primary_fixed_color", None)
+        self.on_primary_fixed_variant_color: str | None = opts.get("on_primary_fixed_variant_color", None)
+        self.on_secondary_color: str | None = opts.get("on_secondary_color", None)
+        self.on_secondary_container_color: str | None = opts.get("on_secondary_container_color", None)
+        self.on_secondary_fixed_color: str | None = opts.get("on_secondary_fixed_color", None)
+        self.on_secondary_fixed_variant_color: str | None = opts.get("on_secondary_fixed_variant_color", None)
+        self.on_surface_color: str | None = opts.get("on_surface_color", None)
+        self.on_surface_variant_color: str | None = opts.get("on_surface_variant_color", None)
+        self.on_tertiary_color: str | None = opts.get("on_tertiary_color", None)
+        self.on_tertiary_container_color: str | None = opts.get("on_tertiary_container_color", None)
+        self.on_tertiary_fixed_color: str | None = opts.get("on_tertiary_fixed_color", None)
+        self.on_tertiary_fixed_variant_color: str | None = opts.get("on_tertiary_fixed_variant_color", None)
+        self.outline_color: str | None = opts.get("outline_color", None)
+        self.outline_variant_color: str | None = opts.get("outline_variant_color", None)
+        self.primary_color: str | None = opts.get("primary_color", None)
+        self.primary_container_color: str | None = opts.get("primary_container_color", None)
+        self.primary_dim_color: str | None = opts.get("primary_dim_color", None)
+        self.primary_fixed_color: str | None = opts.get("primary_fixed_color", None)
+        self.primary_fixed_dim_color: str | None = opts.get("primary_fixed_dim_color", None)
+        self.primary_palette_key_color_color: str | None = opts.get("primary_palette_key_color_color", None)
+        self.scrim_color: str | None = opts.get("scrim_color", None)
+        self.secondary_color: str | None = opts.get("secondary_color", None)
+        self.secondary_container_color: str | None = opts.get("secondary_container_color", None)
+        self.secondary_dim_color: str | None = opts.get("secondary_dim_color", None)
+        self.secondary_fixed_color: str | None = opts.get("secondary_fixed_color", None)
+        self.secondary_fixed_dim_color: str | None = opts.get("secondary_fixed_dim_color", None)
+        self.secondary_palette_key_color_color: str | None = opts.get("secondary_palette_key_color_color", None)
+        self.shadow_color: str | None = opts.get("shadow_color", None)
+        self.surface_color: str | None = opts.get("surface_color", None)
+        self.surface_bright_color: str | None = opts.get("surface_bright_color", None)
+        self.surface_container_color: str | None = opts.get("surface_container_color", None)
+        self.surface_container_high_color: str | None = opts.get("surface_container_high_color", None)
+        self.surface_container_highest_color: str | None = opts.get("surface_container_highest_color", None)
+        self.surface_container_low_color: str | None = opts.get("surface_container_low_color", None)
+        self.surface_container_lowest_color: str | None = opts.get("surface_container_lowest_color", None)
+        self.surface_dim_color: str | None = opts.get("surface_dim_color", None)
+        self.surface_tint_color: str | None = opts.get("surface_tint_color", None)
+        self.surface_variant_color: str | None = opts.get("surface_variant_color", None)
+        self.tertiary_color: str | None = opts.get("tertiary_color", None)
+        self.tertiary_container_color: str | None = opts.get("tertiary_container_color", None)
+        self.tertiary_dim_color: str | None = opts.get("tertiary_dim_color", None)
+        self.tertiary_fixed_color: str | None = opts.get("tertiary_fixed_color", None)
+        self.tertiary_fixed_dim_color: str | None = opts.get("tertiary_fixed_dim_color", None)
+        self.tertiary_palette_key_color_color: str | None = opts.get("tertiary_palette_key_color_color", None)
 
 
 ExceptionManager.add_handler(E())
