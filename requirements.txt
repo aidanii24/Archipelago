@@ -14,8 +14,7 @@ orjson==3.11.7
 typing_extensions==4.15.0
 pyshortcuts==1.9.7
 pathspec==1.0.4
-kivymd @ git+https://github.com/kivymd/KivyMD@be7fb85
-kivymd>=2.0.1.dev0
+kivymd @ git+https://github.com/aidanii24/KivyMD@68233f0
 watchdog==6.0.0
 
 # Legacy world dependencies that custom worlds rely on
