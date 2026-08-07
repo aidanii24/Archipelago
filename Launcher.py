@@ -432,7 +432,6 @@ def run_gui(launch_components: list[Component], args: Any) -> None:
             self.button_layout = self.top_screen.ids.button_layout
             self.search_box = self.top_screen.ids.search_box
             self.set_colors()
-            self.top_screen.md_bg_color = self.theme_cls.backgroundColor
 
             global refresh_components
             refresh_components = self._refresh_components
