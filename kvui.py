@@ -63,7 +63,7 @@ for classobj in SoundLoader._classes:
 
 from kivy.animation import Animation
 from kivy.base import ExceptionHandler, ExceptionManager
-from kivy.clock import Clock, mainthread
+from kivy.clock import Clock
 from kivy.core.clipboard import Clipboard
 from kivy.core.image import ImageData, ImageLoader, ImageLoaderBase
 from kivy.core.text.markup import MarkupLabel
@@ -124,17 +124,23 @@ remove_between_brackets = re.compile(r"\[.*?]")
 class ThemedApp(MDApp):
     opts_path: str = Utils.local_path("data", "theme.json")
 
-    @mainthread
-    def set_colors(self):
-        theme_colors: MaterialYouOptionsParser = MaterialYouOptionsParser(self.opts_path)
-        text_colors = KivyJSONtoTextParser.TextColors()
+    def get_colors(self):
+        if hasattr(self, "theme_colors"):
+            self.theme_colors.get_colors()
+            return self.theme_colors
 
-        self.theme_cls.theme_style = text_colors.theme_style
+        return MaterialYouOptionsParser(self.opts_path)
+
+    def set_colors(self):
+        theme_colors = self.get_colors()
+        text_colors: TextColors = theme_colors.create_text_colors_widget()
+
+        self.theme_cls.theme_style = theme_colors.mode if theme_colors.mode else text_colors.theme_style
         self.theme_cls.primary_palette = text_colors.primary_palette
         self.theme_cls.dynamic_scheme_name = text_colors.dynamic_scheme_name
         self.theme_cls.dynamic_scheme_contrast = text_colors.dynamic_scheme_contrast
 
-        if theme_colors.use_wallpaper and theme_colors.path_to_wallpaper:
+        if theme_colors.use_wallpaper and os.path.isfile(theme_colors.path_to_wallpaper):
             self.theme_cls.dynamic_color = True
             self.theme_cls.path_to_wallpaper = theme_colors.path_to_wallpaper
 
@@ -208,6 +214,9 @@ class ThemedApp(MDApp):
 
         if theme_colors.surface_bright_color:
             self.theme_cls.surfaceBrightColor = theme_colors.surface_bright_color
+
+        if theme_colors.surface_container_color:
+            self.theme_cls.surfaceContainerColor = theme_colors.surface_container_color
 
         if theme_colors.surface_container_lowest_color:
             self.theme_cls.surfaceContainerLowestColor = theme_colors.surface_container_lowest_color
@@ -289,7 +298,10 @@ class ThemedApp(MDApp):
     # but it did point to where it should be instantiated, started and stopped
     # https://gist.github.com/tshirtman/6623577
     def setup_options_watcher(self):
-        handler = MaterialYouOptionsHandler(self.opts_path, self.set_colors)
+        def callback():
+            Clock.schedule_once(lambda x: self.set_colors())
+
+        handler = MaterialYouOptionsHandler(self.opts_path, callback)
         observer = Observer()
 
         observer.schedule(handler, path=Utils.local_path("data"))
@@ -1022,7 +1034,9 @@ class GameManager(ThemedApp):
         self.ctx = ctx
         self.commandprocessor = ctx.command_processor(ctx)
         self.icon = r"data/icon.png"
-        self.json_to_kivy_parser = KivyJSONtoTextParser(ctx)
+        self.theme_colors = MaterialYouOptionsParser(self.opts_path)
+        self.json_to_kivy_parser = KivyJSONtoTextParser(ctx, text_colors=self.theme_colors.create_text_colors_widget())
+
         self.log_panels: dict[str, Widget] = {}
 
         # keep track of last used command to autofill on click
@@ -1161,6 +1175,15 @@ class GameManager(ThemedApp):
         self.setup_options_watcher()
 
         return self.container
+
+    def set_colors(self):
+        result = super().set_colors()
+
+        if self.__dict__.get("hint_log", None):
+            self.hint_log.update_text_colors(self.theme_colors.get_text_colors())
+            self.update_hints()
+
+        return result
 
     def add_client_tab(self, title: str, content: Widget, index: int = -1) -> MDNavigationItemBase:
         """
@@ -1424,7 +1447,13 @@ class HintLog(MDRecycleView):
     def __init__(self, parser):
         super().__init__()
         self.data = [self.header]
-        self.parser = parser
+        self.parser: KivyJSONtoTextParser = parser
+
+    def update_text_colors(self, text_colors: dict[str, str] | None = None):
+        if not text_colors:
+            return
+
+        self.parser.update_color_codes(text_colors)
 
     def refresh_hints(self, hints):
         if not hints:  # Fix the scrolling looking visually wrong in some edge cases
@@ -1542,35 +1571,80 @@ class E(ExceptionHandler):
         return ExceptionManager.PASS
 
 
+# dummy class to absorb kvlang definitions
+class TextColors(Widget):
+    theme_style: str = StringProperty("Dark")
+    primary_palette: str = StringProperty("Lightsteelblue")
+    dynamic_scheme_name: str = StringProperty("VIBRANT")
+    dynamic_scheme_contrast: int = NumericProperty(0)
+
+    white: str = StringProperty("FFFFFF")
+    black: str = StringProperty("000000")
+    red: str = StringProperty("EE0000")
+    green: str = StringProperty("00FF7F")
+    yellow: str = StringProperty("FAFAD2")
+    blue: str = StringProperty("6495ED")
+    magenta: str = StringProperty("EE00EE")
+    cyan: str = StringProperty("00EEEE")
+    slateblue: str = StringProperty("6D8BE8")
+    plum: str = StringProperty("AF99EF")
+    salmon: str = StringProperty("FA8072")
+    orange: str = StringProperty("FF7700")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._set_colors()
+
+    def _set_colors(self):
+        return
+
+    def update_colors(self, colors: dict[str, str] | None = None):
+        if not colors:
+            return
+
+        self.theme_style = colors.get("mode", self.theme_style)
+
+        self.white = colors.get("white", self.white)
+        self.black = colors.get("black", self.black)
+        self.red = colors.get("red", self.red)
+        self.green = colors.get("green", self.green)
+        self.yellow = colors.get("yellow", self.yellow)
+        self.blue = colors.get("blue", self.blue)
+        self.magenta = colors.get("magenta", self.magenta)
+        self.cyan = colors.get("cyan", self.cyan)
+        self.slateblue = colors.get("slateblue", self.slateblue)
+        self.plum = colors.get("plum", self.plum)
+        self.salmon = colors.get("salmon", self.salmon)
+        self.orange = colors.get("orange", self.orange)
+
+    def as_dict(self) -> dict:
+        return {
+            "white": self.white,
+            "black": self.black,
+            "red": self.red,
+            "green": self.green,
+            "yellow": self.yellow,
+            "blue": self.blue,
+            "magenta": self.magenta,
+            "cyan": self.cyan,
+            "slateblue": self.slateblue,
+            "plum": self.plum,
+            "salmon": self.salmon,
+            "theme_style": self.theme_style,
+            "primary_palette": self.primary_palette,
+            "dynamic_scheme_name": self.dynamic_scheme_name,
+            "dynamic_scheme_contrast": self.dynamic_scheme_contrast,
+        }
+
+
 class KivyJSONtoTextParser(JSONtoTextParser):
-    # dummy class to absorb kvlang definitions
-    class TextColors(Widget):
-        white: str = StringProperty("FFFFFF")
-        black: str = StringProperty("000000")
-        red: str = StringProperty("EE0000")
-        green: str = StringProperty("00FF7F")
-        yellow: str = StringProperty("FAFAD2")
-        blue: str = StringProperty("6495ED")
-        magenta: str = StringProperty("EE00EE")
-        cyan: str = StringProperty("00EEEE")
-        slateblue: str = StringProperty("6D8BE8")
-        plum: str = StringProperty("AF99EF")
-        salmon: str = StringProperty("FA8072")
-        orange: str = StringProperty("FF7700")
-
-        # KivyMD parameters
-        theme_style: str = StringProperty("Dark")
-        primary_palette: str = StringProperty("Lightsteelblue")
-        dynamic_scheme_name: str = StringProperty("VIBRANT")
-        dynamic_scheme_contrast: int = NumericProperty(0)
-
     def __init__(self, *args, **kwargs):
-        # we grab the color definitions from the .kv file, then overwrite the JSONtoTextParser default entries
-        colors = self.TextColors()
-        color_codes = self.color_codes.copy()
-        for name, code in color_codes.items():
-            color_codes[name] = getattr(colors, name, code)
-        self.color_codes = color_codes
+        if "text_colors" in kwargs:
+            text_colors = kwargs["text_colors"]
+            del kwargs["text_colors"]
+        else:
+            text_colors = TextColors()
+        self.update_color_codes(text_colors.as_dict())
         super().__init__(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
@@ -1624,13 +1698,22 @@ class KivyJSONtoTextParser(JSONtoTextParser):
             self.ref_count += 1
         return super()._handle_text(node)
 
+    def update_color_codes(self, text_colors: dict[str, str] | None = None):
+        if not text_colors:
+            return
+
+        color_codes = self.color_codes.copy()
+        for name, code in color_codes.items():
+            color_codes[name] = text_colors.get(name, code)
+        self.color_codes = color_codes
+
 
 class MaterialYouOptionsParser:
     def __init__(self, opts_path: str):
         self.opts_path = opts_path
-        self.set_opts()
+        self.get_colors()
 
-    def set_opts(self):
+    def get_colors(self):
         opts: dict = {}
         try:
             with open(self.opts_path, "r") as f:
@@ -1647,9 +1730,12 @@ class MaterialYouOptionsParser:
         except json.JSONDecodeError:
             logging.warning("MaterialYouOptionsParser: The options json is malformed. Please check your options json.")
 
+        # General
+        self.mode: str = opts.get("mode", "Dark").capitalize()
+
         # Wallpaper Options
         self.use_wallpaper: bool = opts.get("use_wallpaper", False)
-        self.path_to_wallpaper: str | None = os.path.expanduser(opts.get("path_to_wallpaper", ""))
+        self.path_to_wallpaper: str = os.path.expanduser(opts.get("path_to_wallpaper", ""))
 
         # Dynamic Colors
         self.background_color: str | None = opts.get("background_color", None)
@@ -1713,6 +1799,125 @@ class MaterialYouOptionsParser:
         self.tertiary_fixed_color: str | None = opts.get("tertiary_fixed_color", None)
         self.tertiary_fixed_dim_color: str | None = opts.get("tertiary_fixed_dim_color", None)
         self.tertiary_palette_key_color_color: str | None = opts.get("tertiary_palette_key_color_color", None)
+
+        # Base16/ANSII
+        self.black: str | None = opts.get("base00", None)
+        self.red: str | None = opts.get("base01", None)
+        self.green: str | None = opts.get("base02", None)
+        self.yellow: str | None = opts.get("base03", None)
+        self.blue: str | None = opts.get("base04", None)
+        self.magenta: str | None = opts.get("base05", None)
+        self.cyan: str | None = opts.get("base06", None)
+        self.white: str | None = opts.get("base07", None)
+        self.bright_black: str | None = opts.get("base08", None)
+        self.bright_red: str | None = opts.get("base09", None)
+        self.bright_green: str | None = opts.get("base0a", None)
+        self.bright_yellow: str | None = opts.get("base0b", None)
+        self.bright_blue: str | None = opts.get("base0c", None)
+        self.bright_magenta: str | None = opts.get("base0d", None)
+        self.bright_cyan: str | None = opts.get("base0e", None)
+        self.bright_white: str | None = opts.get("base0f", None)
+
+    def has_theme_colors(self) -> bool:
+        return bool(self.primary_color)
+
+    def has_text_colors(self) -> bool:
+        return all(
+            [
+                self.black,
+                self.red,
+                self.green,
+                self.yellow,
+                self.blue,
+                self.magenta,
+                self.cyan,
+                self.white,
+                self.bright_black,
+                self.bright_red,
+                self.bright_green,
+                self.bright_yellow,
+                self.bright_blue,
+                self.bright_magenta,
+                self.bright_cyan,
+                self.bright_white,
+            ]
+        )
+
+    def get_text_colors(self) -> dict[str, str]:
+        text_colors: dict[str, str] = {}
+
+        if self.black:
+            text_colors["black"] = self.black
+        if self.red:
+            text_colors["red"] = self.red
+        if self.green:
+            text_colors["green"] = self.green
+        if self.yellow:
+            text_colors["yellow"] = self.yellow
+        if self.blue:
+            text_colors["blue"] = self.blue
+        if self.magenta:
+            text_colors["magenta"] = self.magenta
+        if self.cyan:
+            text_colors["cyan"] = self.cyan
+        if self.white:
+            text_colors["white"] = self.white
+        if self.bright_red:
+            text_colors["salmon"] = self.bright_red
+        if self.bright_blue:
+            text_colors["slateblue"] = self.bright_blue
+        if self.bright_magenta:
+            text_colors["plum"] = self.bright_magenta
+        if self.bright_yellow:
+            text_colors["orange"] = self.bright_yellow
+
+        return text_colors
+
+    def create_text_colors_widget(self) -> TextColors:
+        if not self.has_text_colors():
+            return TextColors()
+
+        parent = self
+
+        class MaterialYouTextColors(TextColors):
+            theme_style: str = StringProperty("Dark")
+            primary_palette: str = StringProperty("Lightsteelblue")
+            dynamic_scheme_name: str = StringProperty("VIBRANT")
+            dynamic_scheme_contrast: int = NumericProperty(0)
+
+            white = StringProperty()
+            black = StringProperty()
+            red = StringProperty()
+            green = StringProperty()
+            yellow = StringProperty()
+            blue = StringProperty()
+            magenta = StringProperty()
+            cyan = StringProperty()
+            slateblue = StringProperty()
+            plum = StringProperty()
+            salmon = StringProperty()
+            orange = StringProperty()
+
+            def _set_colors(self):
+                self.theme_style: str = parent.mode
+                self.primary_palette: str = "Lightsteelblue"
+                self.dynamic_scheme_name: str = "VIBRANT"
+                self.dynamic_scheme_contrast: int = 0
+
+                self.white: str = parent.white
+                self.black: str = parent.black
+                self.red: str = parent.red
+                self.green: str = parent.green
+                self.yellow: str = parent.yellow
+                self.blue: str = parent.blue
+                self.magenta: str = parent.magenta
+                self.cyan: str = parent.cyan
+                self.slateblue: str = parent.bright_blue
+                self.plum: str = parent.bright_magenta
+                self.salmon: str = parent.bright_red
+                self.orange: str = parent.bright_yellow
+
+        return MaterialYouTextColors()
 
 
 class MaterialYouOptionsHandler(events.FileSystemEventHandler):
