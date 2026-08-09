@@ -4,8 +4,20 @@ if __name__ == "__main__":
     ModuleUpdate.update()
 
 
-from kvui import (ThemedApp, ScrollBox, MainLayout, ContainerLayout, dp, Widget, MDBoxLayout, TooltipLabel, MDLabel,
-                  ToggleButton, MarkupDropdown, ResizableTextField)
+from kvui import (
+    ThemedApp,
+    ScrollBox,
+    MainLayout,
+    ContainerLayout,
+    dp,
+    Widget,
+    MDBoxLayout,
+    TooltipLabel,
+    MDLabel,
+    ToggleButton,
+    MarkupDropdown,
+    ResizableTextField,
+)
 from kivy.clock import Clock
 from kivy.uix.behaviors.button import ButtonBehavior
 from kivymd.uix.behaviors import RotateBehavior
@@ -29,8 +41,19 @@ import webbrowser
 import re
 from urllib.parse import urlparse
 from worlds.AutoWorld import AutoWorldRegister, World
-from Options import (Option, Toggle, TextChoice, Choice, FreeText, NamedRange, Range, OptionSet, OptionList,
-                     OptionCounter, Visibility)
+from Options import (
+    Option,
+    Toggle,
+    TextChoice,
+    Choice,
+    FreeText,
+    NamedRange,
+    Range,
+    OptionSet,
+    OptionList,
+    OptionCounter,
+    Visibility,
+)
 
 
 def validate_url(x):
@@ -44,8 +67,9 @@ def validate_url(x):
 def filter_tooltip(tooltip):
     if tooltip is None:
         tooltip = "No tooltip available."
-    tooltip = dedent(tooltip).strip().replace("\n", "<br>").replace("&", "&amp;") \
-        .replace("[", "&bl;").replace("]", "&br;")
+    tooltip = (
+        dedent(tooltip).strip().replace("\n", "<br>").replace("&", "&amp;").replace("[", "&bl;").replace("]", "&br;")
+    )
     tooltip = re.sub(r"\*\*(.+?)\*\*", r"[b]\g<1>[/b]", tooltip)
     tooltip = re.sub(r"\*(.+?)\*", r"[i]\g<1>[/i]", tooltip)
     return escape_markup(tooltip)
@@ -134,8 +158,9 @@ class VisualTextChoice(MDBoxLayout):
     choice: VisualChoice = ObjectProperty(None)
     text: VisualFreeText = ObjectProperty(None)
 
-    def __init__(self, *args, option: typing.Type[TextChoice], name: str, choice: VisualChoice,
-                 text: VisualFreeText, **kwargs):
+    def __init__(
+        self, *args, option: typing.Type[TextChoice], name: str, choice: VisualChoice, text: VisualFreeText, **kwargs
+    ):
         self.option = option
         self.name = name
         super(MDBoxLayout, self).__init__(*args, **kwargs)
@@ -157,7 +182,7 @@ class VisualToggle(MDBoxLayout):
 
 
 class CounterItemValue(ResizableTextField):
-    pat = re.compile('[^0-9]')
+    pat = re.compile("[^0-9]")
 
     def insert_text(self, substring, from_undo=False):
         return super().insert_text(re.sub(self.pat, "", substring), from_undo=from_undo)
@@ -173,28 +198,43 @@ class VisualListSetCounter(MDDialog):
     dropdown: MDDropdownMenu
     valid_keys: typing.Iterable[str]
 
-    def __init__(self, *args, option: typing.Type[OptionSet] | typing.Type[OptionList],
-                 name: str, valid_keys: typing.Iterable[str], **kwargs):
+    def __init__(
+        self,
+        *args,
+        option: typing.Type[OptionSet] | typing.Type[OptionList],
+        name: str,
+        valid_keys: typing.Iterable[str],
+        **kwargs,
+    ):
         self.option = option
         self.name = name
         self.valid_keys = valid_keys
         super().__init__(*args, **kwargs)
-        self.dropdown = MarkupDropdown(caller=self.input, border_margin=dp(2),
-                                       width=self.input.width, position="bottom")
+        self.dropdown = MarkupDropdown(
+            caller=self.input, border_margin=dp(2), width=self.input.width, position="bottom"
+        )
         self.input.bind(text=self.on_text)
         self.input.bind(on_text_validate=self.validate_add)
 
     def validate_add(self, instance):
         if self.valid_keys:
             if self.input.text not in self.valid_keys:
-                MDSnackbar(MDSnackbarText(text="Item must be a valid key for this option."), y=dp(24),
-                           pos_hint={"center_x": 0.5}, size_hint_x=0.5).open()
+                MDSnackbar(
+                    MDSnackbarText(text="Item must be a valid key for this option."),
+                    y=dp(24),
+                    pos_hint={"center_x": 0.5},
+                    size_hint_x=0.5,
+                ).open()
                 return
 
         if not issubclass(self.option, OptionList):
             if any(self.input.text == child.text.text for child in self.scrollbox.layout.children):
-                MDSnackbar(MDSnackbarText(text="This value is already in the set."), y=dp(24),
-                           pos_hint={"center_x": 0.5}, size_hint_x=0.5).open()
+                MDSnackbar(
+                    MDSnackbarText(text="This value is already in the set."),
+                    y=dp(24),
+                    pos_hint={"center_x": 0.5},
+                    size_hint_x=0.5,
+                ).open()
                 return
 
         self.add_set_item(self.input.text)
@@ -208,9 +248,9 @@ class VisualListSetCounter(MDDialog):
         text = MDListItemSupportingText(text=key, id="value")
         if issubclass(self.option, OptionCounter):
             value_txt = CounterItemValue(text=str(value) if value else "1")
-            item = MDListItem(text,
-                              value_txt,
-                              MDIconButton(icon="minus", on_release=self.remove_item), focus_behavior=False)
+            item = MDListItem(
+                text, value_txt, MDIconButton(icon="minus", on_release=self.remove_item), focus_behavior=False
+            )
             item.value = value_txt
         else:
             item = MDListItem(text, MDIconButton(icon="minus", on_release=self.remove_item), focus_behavior=False)
@@ -225,8 +265,9 @@ class VisualListSetCounter(MDDialog):
 
             def on_press(txt):
                 split_text = MarkupLabel(text=txt, markup=True).markup
-                self.input.set_text(self.input, "".join(text_frag for text_frag in split_text
-                                                        if not text_frag.startswith("[")))
+                self.input.set_text(
+                    self.input, "".join(text_frag for text_frag in split_text if not text_frag.startswith("["))
+                )
                 self.input.focus = True
                 self.dropdown.dismiss()
 
@@ -238,12 +279,10 @@ class VisualListSetCounter(MDDialog):
                     pass  # substring not found
                 else:
                     text = escape_markup(item_name)
-                    text = text[:index] + "[b]" + text[index:index + len(value)] + "[/b]" + text[index + len(value):]
-                    self.dropdown.items.append({
-                        "text": text,
-                        "on_release": lambda txt=text: on_press(txt),
-                        "markup": True
-                    })
+                    text = text[:index] + "[b]" + text[index : index + len(value)] + "[/b]" + text[index + len(value) :]
+                    self.dropdown.items.append(
+                        {"text": text, "on_release": lambda txt=text: on_press(txt), "markup": True}
+                    )
             if not self.dropdown.parent:
                 self.dropdown.open()
         else:
@@ -281,8 +320,11 @@ class OptionsCreator(ThemedApp):
 
     def export_options_background(self, options: dict[str, typing.Any]) -> None:
         try:
-            file_name = Utils.save_filename("Export Options File As...", [("YAML", [".yaml"])],
-                                            Utils.get_file_safe_name(f"{self.name_input.text}.yaml"))
+            file_name = Utils.save_filename(
+                "Export Options File As...",
+                [("YAML", [".yaml"])],
+                Utils.get_file_safe_name(f"{self.name_input.text}.yaml"),
+            )
         except Exception:
             self.on_export_result("Could not open dialog. Already open?")
             raise
@@ -292,7 +334,7 @@ class OptionsCreator(ThemedApp):
             return
 
         try:
-            with open(file_name, 'w') as f:
+            with open(file_name, "w") as f:
                 f.write(Utils.dump(options, sort_keys=False))
                 f.close()
                 self.on_export_result("File saved successfully.")
@@ -303,11 +345,12 @@ class OptionsCreator(ThemedApp):
     def export_options(self, button: Widget) -> None:
         if 0 < len(self.name_input.text) < 17 and self.current_game:
             import threading
+
             options = {
                 "name": self.name_input.text,
                 "description": f"YAML generated by Archipelago {Utils.__version__}.",
                 "game": self.current_game,
-                self.current_game: {k: check_random(v) for k, v in self.options.items()}
+                self.current_game: {k: check_random(v) for k, v in self.options.items()},
             }
             threading.Thread(target=self.export_options_background, args=(options,), daemon=True).start()
             self.container.disabled = True
@@ -334,8 +377,9 @@ class OptionsCreator(ThemedApp):
         def set_to_custom(range_box: VisualNamedRange):
             range_box.range.tag.text = str(int(range_box.range.slider.value))
             if range_box.range.slider.value in option.special_range_names.values():
-                value = next(key for key, val in option.special_range_names.items()
-                             if val == range_box.range.slider.value)
+                value = next(
+                    key for key, val in option.special_range_names.items() if val == range_box.range.slider.value
+                )
                 self.options[name] = value
                 set_button_text(box.choice, value.title())
             else:
@@ -346,8 +390,9 @@ class OptionsCreator(ThemedApp):
             button.text.text = text
 
         def set_value(text: str, range_box: VisualNamedRange):
-            range_box.range.slider.value = min(max(option.special_range_names[text.lower()], option.range_start),
-                                               option.range_end)
+            range_box.range.slider.value = min(
+                max(option.special_range_names[text.lower()], option.range_start), option.range_end
+            )
             range_box.range.tag.text = str(option.special_range_names[text.lower()])
             set_button_text(range_box.choice, text)
             self.options[name] = text.lower()
@@ -361,8 +406,7 @@ class OptionsCreator(ThemedApp):
         default: int | str = option.default
         if default in option.special_range_names:
             # value can get mismatched in this case
-            box.range.slider.value = min(max(option.special_range_names[default], option.range_start),
-                                               option.range_end)
+            box.range.slider.value = min(max(option.special_range_names[default], option.range_start), option.range_end)
             box.range.tag.text = str(int(box.range.slider.value))
         elif default in option.special_range_names.values():
             # better visual
@@ -370,10 +414,7 @@ class OptionsCreator(ThemedApp):
             set_button_text(box.choice, default.title())
         box.range.slider.bind(value=lambda _, _2: set_to_custom(box))
         items = [
-            {
-                "text": choice.title(),
-                "on_release": lambda text=choice.title(): set_value(text, box)
-            }
+            {"text": choice.title(), "on_release": lambda text=choice.title(): set_value(text, box)}
             for choice in option.special_range_names
         ]
         box.range.slider.dropdown = MDDropdownMenu(caller=box.choice, items=items)
@@ -411,7 +452,7 @@ class OptionsCreator(ThemedApp):
         items = [
             {
                 "text": option.get_option_name(choice),
-                "on_release": lambda val=choice: set_value(option.get_option_name(val), option.name_lookup[val])
+                "on_release": lambda val=choice: set_value(option.get_option_name(val), option.name_lookup[val]),
             }
             for choice in option.name_lookup
         ]
@@ -425,8 +466,9 @@ class OptionsCreator(ThemedApp):
                 if isinstance(child, MDButtonText):
                     child.text = text
 
-        box = VisualTextChoice(option=option, name=name, choice=self.create_choice(option, name),
-                               text=self.create_free_text(option, name))
+        box = VisualTextChoice(
+            option=option, name=name, choice=self.create_choice(option, name), text=self.create_free_text(option, name)
+        )
 
         def set_value(instance):
             set_button_text(box.choice, "Custom")
@@ -449,8 +491,12 @@ class OptionsCreator(ThemedApp):
 
         return checkbox
 
-    def create_popup(self, option: typing.Type[OptionList] | typing.Type[OptionSet] | typing.Type[OptionCounter],
-                     name: str, world: typing.Type[World]):
+    def create_popup(
+        self,
+        option: typing.Type[OptionList] | typing.Type[OptionSet] | typing.Type[OptionCounter],
+        name: str,
+        world: typing.Type[World],
+    ):
 
         valid_keys = sorted(option.valid_keys)
         if option.verify_item_name:
@@ -463,12 +509,14 @@ class OptionsCreator(ThemedApp):
                 valid_keys += list(world.location_name_groups.keys())
 
         if not issubclass(option, OptionCounter):
+
             def apply_changes(button):
                 self.options[name].clear()
                 for list_item in dialog.scrollbox.layout.children:
                     self.options[name].append(getattr(list_item.text, "text"))
                 dialog.dismiss()
         else:
+
             def apply_changes(button):
                 self.options[name].clear()
                 for list_item in dialog.scrollbox.layout.children:
@@ -492,8 +540,12 @@ class OptionsCreator(ThemedApp):
         dialog.save.bind(on_release=apply_changes)
         dialog.open()
 
-    def create_option_set_list_counter(self, option: typing.Type[OptionList] | typing.Type[OptionSet] |
-                                       typing.Type[OptionCounter], name: str, world: typing.Type[World]):
+    def create_option_set_list_counter(
+        self,
+        option: typing.Type[OptionList] | typing.Type[OptionSet] | typing.Type[OptionCounter],
+        name: str,
+        world: typing.Type[World],
+    ):
         main_button = MDButton(MDButtonText(text="Edit"), on_release=lambda x: self.create_popup(option, name, world))
 
         if name not in self.options:
@@ -532,10 +584,15 @@ class OptionsCreator(ThemedApp):
         elif any(issubclass(option, cls) for cls in (OptionSet, OptionList, OptionCounter)):
             option_base.add_widget(self.create_option_set_list_counter(option, name, world))
         else:
-            option_base.add_widget(MDLabel(text="This option isn't supported by the option creator.\n"
-                                                "Please edit your yaml manually to set this option."))
+            option_base.add_widget(
+                MDLabel(
+                    text="This option isn't supported by the option creator.\n"
+                    "Please edit your yaml manually to set this option."
+                )
+            )
 
         if option_can_be_randomized(option):
+
             def randomize_option(instance: Widget, value: str):
                 value = value == "down"
                 if value:
@@ -554,8 +611,12 @@ class OptionsCreator(ThemedApp):
                         child.disabled = value
 
             default_random = option.default == "random"
-            random_toggle = ToggleButton(MDButtonText(text="Random?"), size_hint_x=None, width=dp(100),
-                                         state="down" if default_random else "normal")
+            random_toggle = ToggleButton(
+                MDButtonText(text="Random?"),
+                size_hint_x=None,
+                width=dp(100),
+                state="down" if default_random else "normal",
+            )
             random_toggle.bind(state=randomize_option)
             label_box.add_widget(random_toggle)
             if default_random:
@@ -576,21 +637,31 @@ class OptionsCreator(ThemedApp):
             self.current_game = "None"
             if validate_url(cls.web.options_page):
                 webbrowser.open(cls.web.options_page)
-                MDSnackbar(MDSnackbarText(text="Launching in default browser..."), y=dp(24), pos_hint={"center_x": 0.5},
-                           size_hint_x=0.5).open()
+                MDSnackbar(
+                    MDSnackbarText(text="Launching in default browser..."),
+                    y=dp(24),
+                    pos_hint={"center_x": 0.5},
+                    size_hint_x=0.5,
+                ).open()
                 world_button.state = "normal"
             else:
                 # attach onto archipelago.gg and see if we pass
                 new_url = "https://archipelago.gg/" + cls.web.options_page
                 if validate_url(new_url):
                     webbrowser.open(new_url)
-                    MDSnackbar(MDSnackbarText(text="Launching in default browser..."), y=dp(24),
-                               pos_hint={"center_x": 0.5},
-                               size_hint_x=0.5).open()
+                    MDSnackbar(
+                        MDSnackbarText(text="Launching in default browser..."),
+                        y=dp(24),
+                        pos_hint={"center_x": 0.5},
+                        size_hint_x=0.5,
+                    ).open()
                 else:
-                    MDSnackbar(MDSnackbarText(text="Invalid options page, please report to world developer."), y=dp(24),
-                               pos_hint={"center_x": 0.5},
-                               size_hint_x=0.5).open()
+                    MDSnackbar(
+                        MDSnackbarText(text="Invalid options page, please report to world developer."),
+                        y=dp(24),
+                        pos_hint={"center_x": 0.5},
+                        size_hint_x=0.5,
+                    ).open()
                 world_button.state = "normal"
                 # else just fall through
         else:
@@ -606,26 +677,31 @@ class OptionsCreator(ThemedApp):
                 groups[group].append((name, option))
 
             for group, options in groups.items():
-                options = [(name, option) for name, option in options
-                           if name and option.visibility & Visibility.simple_ui]
+                options = [
+                    (name, option) for name, option in options if name and option.visibility & Visibility.simple_ui
+                ]
                 if not options:
                     continue  # Game Options can be empty if every other option is in another group
                     # Can also have an option group of options that should not render on simple ui
                 group_item = MDExpansionPanel(size_hint_y=None)
-                group_header = MDExpansionPanelHeader(MDListItem(MDListItemSupportingText(text=group),
-                                                                 TrailingPressedIconButton(icon="chevron-right",
-                                                                                           on_release=lambda x,
-                                                                                           item=group_item:
-                                                                                           self.tap_expansion_chevron(
-                                                                                               item, x)),
-                                                                 md_bg_color=self.theme_cls.surfaceContainerLowestColor,
-                                                                 theme_bg_color="Custom",
-                                                                 on_release=lambda x, item=group_item:
-                                                                 self.tap_expansion_chevron(item, x)))
-                group_content = MDExpansionPanelContent(orientation="vertical", theme_bg_color="Custom",
-                                                        md_bg_color=self.theme_cls.surfaceContainerLowestColor,
-                                                        padding=[dp(12), dp(100), dp(12), 0],
-                                                        spacing=dp(3))
+                group_header = MDExpansionPanelHeader(
+                    MDListItem(
+                        MDListItemSupportingText(text=group),
+                        TrailingPressedIconButton(
+                            icon="chevron-right",
+                            on_release=lambda x, item=group_item: self.tap_expansion_chevron(item, x),
+                        ),
+                        md_bg_color=self.theme_cls.surfaceContainerLowestColor,
+                        theme_bg_color="Custom",
+                        on_release=lambda x, item=group_item: self.tap_expansion_chevron(item, x),
+                    )
+                )
+                group_content = MDExpansionPanelContent(
+                    orientation="vertical",
+                    theme_bg_color="Custom",
+                    padding=[dp(12), dp(100), dp(12), 0],
+                    spacing=dp(3),
+                )
                 group_item.add_widget(group_header)
                 group_item.add_widget(group_content)
                 group_box = ScrollBox()
@@ -640,13 +716,17 @@ class OptionsCreator(ThemedApp):
     @staticmethod
     def tap_expansion_chevron(panel: MDExpansionPanel, chevron: TrailingPressedIconButton | MDListItem):
         if isinstance(chevron, MDListItem):
-            chevron = next((child for child in chevron.ids.trailing_container.children
-                            if isinstance(child, TrailingPressedIconButton)), None)
+            chevron = next(
+                (
+                    child
+                    for child in chevron.ids.trailing_container.children
+                    if isinstance(child, TrailingPressedIconButton)
+                ),
+                None,
+            )
         panel.open() if not panel.is_open else panel.close()
         if chevron:
-            panel.set_chevron_down(
-                chevron
-            ) if not panel.is_open else panel.set_chevron_up(chevron)
+            panel.set_chevron_down(chevron) if not panel.is_open else panel.set_chevron_up(chevron)
 
     def build(self):
         self.set_colors()
@@ -658,8 +738,10 @@ class OptionsCreator(ThemedApp):
 
         def world_button_action(world_btn: WorldButton):
             if self.current_game != world_btn.world_cls.game:
-                old_button = next((button for button in self.scrollbox.layout.children
-                                   if button.world_cls.game == self.current_game), None)
+                old_button = next(
+                    (button for button in self.scrollbox.layout.children if button.world_cls.game == self.current_game),
+                    None,
+                )
                 if old_button:
                     old_button.state = "normal"
             else:
@@ -669,14 +751,17 @@ class OptionsCreator(ThemedApp):
         for world, cls in sorted(AutoWorldRegister.world_types.items(), key=lambda x: x[0]):
             if cls.hidden:
                 continue
-            world_text = MDButtonText(text=world, size_hint_y=None, width=dp(150),
-                                      pos_hint={"x": 0.03, "center_y": 0.5})
+            world_text = MDButtonText(
+                text=world, size_hint_y=None, width=dp(150), pos_hint={"x": 0.03, "center_y": 0.5}
+            )
             world_text.text_size = (world_text.width, None)
-            world_text.bind(width=lambda *x, text=world_text: text.setter('text_size')(text, (text.width, None)),
-                            texture_size=lambda *x, text=world_text: text.setter("height")(text,
-                                                                                           world_text.texture_size[1]))
-            world_button = WorldButton(world_text, size_hint_x=None, width=dp(150), theme_width="Custom",
-                                       radius=(dp(5), dp(5), dp(5), dp(5)))
+            world_text.bind(
+                width=lambda *x, text=world_text: text.setter("text_size")(text, (text.width, None)),
+                texture_size=lambda *x, text=world_text: text.setter("height")(text, world_text.texture_size[1]),
+            )
+            world_button = WorldButton(
+                world_text, size_hint_x=None, width=dp(150), theme_width="Custom", radius=(dp(5), dp(5), dp(5), dp(5))
+            )
             world_button.bind(on_release=world_button_action)
             world_button.world_cls = cls
             self.scrollbox.layout.add_widget(world_button)
@@ -696,6 +781,8 @@ class OptionsCreator(ThemedApp):
         # from kivy.modules.console import create_console
         # from kivy.core.window import Window
         # create_console(Window, self.container)
+
+        self.setup_options_watcher()
 
         return self.container
 

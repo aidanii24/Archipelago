@@ -366,27 +366,14 @@ class ToggleButton(MDButton, ToggleButtonBehavior):
     def _update_bg(self, _, state: str):
         if self.disabled:
             return
-        if self.theme_bg_color == "Primary":
-            self.theme_bg_color = "Custom"
+        self.theme_bg_color = "Custom"
 
         if state == "down":
-            self.md_bg_color = self.theme_cls.primaryColor
             for child in self.children:
-                if child.theme_text_color == "Primary":
-                    child.theme_text_color = "Custom"
-                if child.theme_icon_color == "Primary":
-                    child.theme_icon_color = "Custom"
-                child.text_color = self.theme_cls.onPrimaryColor
-                child.icon_color = self.theme_cls.onPrimaryColor
+                child.theme_icon_color = "Custom"
         else:
-            self.md_bg_color = self.theme_cls.surfaceContainerLowColor
             for child in self.children:
-                if child.theme_text_color == "Primary":
-                    child.theme_text_color = "Custom"
-                if child.theme_icon_color == "Primary":
-                    child.theme_icon_color = "Custom"
-                child.text_color = self.theme_cls.primaryColor
-                child.icon_color = self.theme_cls.primaryColor
+                child.theme_icon_color = "Custom"
 
 
 # thanks kivymd
