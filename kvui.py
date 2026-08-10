@@ -71,7 +71,7 @@ from kivy.core.window import Window
 from kivy.factory import Factory
 from kivy.lang import Builder
 from kivy.metrics import dp, sp
-from kivy.properties import BooleanProperty, NumericProperty, ObjectProperty, StringProperty
+from kivy.properties import BooleanProperty, ColorProperty, NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.behaviors import FocusBehavior, ToggleButtonBehavior
 from kivy.uix.image import AsyncImage
 from kivy.uix.layout import Layout
@@ -358,22 +358,37 @@ class ScrollBox(MDScrollView):
 
 # thanks kivymd
 class ToggleButton(MDButton, ToggleButtonBehavior):
+    # ColorProperty is needed to bind the colors and make sure they update when new colors are applied
+    normal_content_color: str = ColorProperty("000000")
+    active_content_color: str = ColorProperty("FFFFFF")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bind(state=self._update_bg)
-        self._update_bg(self, self.state)
 
-    def _update_bg(self, _, state: str):
-        if self.disabled:
-            return
-        self.theme_bg_color = "Custom"
+        self.normal_content_color = self.theme_cls.primaryColor
+        self.active_content_color = self.theme_cls.onPrimaryColor
 
-        if state == "down":
-            for child in self.children:
-                child.theme_icon_color = "Custom"
+    # Swapping themes is necessary to force update the colors of the text
+    @classmethod
+    def _swap_theme(cls, widget):
+        if widget.theme_text_color == "Primary":
+            widget.theme_text_color = "Custom"
         else:
-            for child in self.children:
-                child.theme_icon_color = "Custom"
+            widget.theme_text_color = "Primary"
+        if widget.theme_icon_color == "Primary":
+            widget.theme_icon_color = "Custom"
+        else:
+            widget.theme_icon_color = "Primary"
+
+    def on_state(self, widget, value):
+        if value == "normal":
+            for child in widget.children:
+                self._swap_theme(child)
+                child.text_color = self.normal_content_color
+        if value == "down":
+            for child in widget.children:
+                self._swap_theme(child)
+                child.text_color = self.active_content_color
 
 
 # thanks kivymd
