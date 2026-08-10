@@ -301,10 +301,13 @@ class ThemedApp(MDApp):
         def callback():
             Clock.schedule_once(lambda x: self.set_colors())
 
+        # Set Level to INFO; Watchdog logs at DEBUG by default
+        logging.getLogger("watchdog").setLevel(logging.INFO)
+
         handler = MaterialYouOptionsHandler(self.opts_path, callback)
         observer = Observer()
 
-        observer.schedule(handler, path=Utils.local_path("data"))
+        observer.schedule(handler, path=os.path.dirname(self.opts_path))
         observer.start()
 
         self.observer = observer
