@@ -103,8 +103,7 @@ from kivymd.uix.tooltip import MDTooltip, MDTooltipPlain
 
 fade_in_animation = Animation(opacity=0, duration=0) + Animation(opacity=1, duration=0.25)
 
-import json
-
+import yaml
 from watchdog import events
 from watchdog.observers import Observer
 
@@ -122,7 +121,7 @@ remove_between_brackets = re.compile(r"\[.*?]")
 
 
 class ThemedApp(MDApp):
-    opts_path: str = Utils.local_path("data", "themes", "theme.json")
+    opts_path: str = Utils.user_path("data", "themes", "theme.yml")
 
     def get_colors(self):
         if hasattr(self, "theme_colors"):
@@ -1722,18 +1721,20 @@ class MaterialYouOptionsParser:
         opts: dict = {}
         try:
             with open(self.opts_path, "r") as f:
-                opts = json.load(f)
+                opts = yaml.safe_load(f)
                 f.close()
         except FileNotFoundError:
-            logging.warning("MaterialYouOptionsParser: Could not find colors.json in the data folder.")
+            logging.warning(f"MaterialYouOptionsParser: Could not find {self.opts_path} in the data folder.")
             pass
         except PermissionError:
             logging.warning(
                 f"MaterialYouOptionsParser: {self.opts_path} was found,"
                 "but could not be accessed. Please check your permissions."
             )
-        except json.JSONDecodeError:
-            logging.warning("MaterialYouOptionsParser: The options json is malformed. Please check your options json.")
+        except yaml.YAMLError:
+            logging.warning(
+                f"MaterialYouOptionsParser: {self.opts_path} might be malformed. Please check your options file."
+            )
 
         # General
         self.mode: str = opts.get("mode", "Dark").capitalize()
