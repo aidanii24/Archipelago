@@ -122,7 +122,7 @@ remove_between_brackets = re.compile(r"\[.*?]")
 
 
 class ThemedApp(MDApp):
-    opts_path: str = Utils.local_path("data", "theme.json")
+    opts_path: str = Utils.local_path("data", "themes", "theme.json")
 
     def get_colors(self):
         if hasattr(self, "theme_colors"):
@@ -135,7 +135,7 @@ class ThemedApp(MDApp):
         theme_colors = self.get_colors()
         text_colors: TextColors = theme_colors.create_text_colors_widget()
 
-        self.theme_cls.theme_style = theme_colors.mode if theme_colors.mode
+        self.theme_cls.theme_style = theme_colors.mode
         self.theme_cls.primary_palette = text_colors.primary_palette
         self.theme_cls.dynamic_scheme_name = theme_colors.scheme
         self.theme_cls.dynamic_scheme_contrast = text_colors.dynamic_scheme_contrast
