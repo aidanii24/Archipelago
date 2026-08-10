@@ -387,10 +387,12 @@ class ToggleButton(MDButton, ToggleButtonBehavior):
             for child in widget.children:
                 self._swap_theme(child)
                 child.text_color = self.normal_content_color
+                child.icon_color = self.normal_content_color
         if value == "down":
             for child in widget.children:
                 self._swap_theme(child)
                 child.text_color = self.active_content_color
+                child.icon_color = self.active_content_color
 
 
 # thanks kivymd
@@ -1723,6 +1725,8 @@ class MaterialYouOptionsParser:
             with open(self.opts_path, "r") as f:
                 opts = yaml.safe_load(f)
                 f.close()
+
+            logging.info(f"MaterialYouOptionsParser: Fetched new colors from {self.opts_path}.")
         except FileNotFoundError:
             logging.warning(f"MaterialYouOptionsParser: Could not find {self.opts_path} in the data folder.")
             pass
@@ -1910,8 +1914,6 @@ class MaterialYouOptionsParser:
                 self.primary_palette: str = "Lightsteelblue"
                 self.dynamic_scheme_name: str = parent.scheme
                 self.dynamic_scheme_contrast: int = 0
-
-                print(">> TEXT COLORS SCHEME:", self.dynamic_scheme_name)
 
                 self.white: str = parent.white
                 self.black: str = parent.black
