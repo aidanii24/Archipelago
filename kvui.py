@@ -135,9 +135,9 @@ class ThemedApp(MDApp):
         theme_colors = self.get_colors()
         text_colors: TextColors = theme_colors.create_text_colors_widget()
 
-        self.theme_cls.theme_style = theme_colors.mode if theme_colors.mode else text_colors.theme_style
+        self.theme_cls.theme_style = theme_colors.mode if theme_colors.mode
         self.theme_cls.primary_palette = text_colors.primary_palette
-        self.theme_cls.dynamic_scheme_name = text_colors.dynamic_scheme_name
+        self.theme_cls.dynamic_scheme_name = theme_colors.scheme
         self.theme_cls.dynamic_scheme_contrast = text_colors.dynamic_scheme_contrast
 
         if theme_colors.use_wallpaper and os.path.isfile(theme_colors.path_to_wallpaper):
@@ -1734,6 +1734,7 @@ class MaterialYouOptionsParser:
 
         # General
         self.mode: str = opts.get("mode", "Dark").capitalize()
+        self.scheme: str = opts.get("scheme", "VIBRANT").upper()
 
         # Wallpaper Options
         self.use_wallpaper: bool = opts.get("use_wallpaper", False)
@@ -1903,8 +1904,10 @@ class MaterialYouOptionsParser:
             def _set_colors(self):
                 self.theme_style: str = parent.mode
                 self.primary_palette: str = "Lightsteelblue"
-                self.dynamic_scheme_name: str = "VIBRANT"
+                self.dynamic_scheme_name: str = parent.scheme
                 self.dynamic_scheme_contrast: int = 0
+
+                print(">> TEXT COLORS SCHEME:", self.dynamic_scheme_name)
 
                 self.white: str = parent.white
                 self.black: str = parent.black
