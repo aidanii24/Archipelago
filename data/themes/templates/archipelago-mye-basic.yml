@@ -1,0 +1,31 @@
+# archipelago-mye Basic Template
+# by @aidanii
+
+# USAGE
+# After configuration, place this file inside a themes folder in your Archipelago data folder, (e.g. Archipelago/data/themes/). The Archipelago data folder is usually placed in these platform standard data directories:
+# Linux: $XDG_DATA_HOME/Archipelago or ~/.local/share/Archipelago/
+# Linux (tarball): Archipelago/data/
+# MacOS: ~/Library/Application Support/Archipelago
+# Windows: ~\AppData\Local\Acme\Archipelago
+
+
+# [ General Material Options ]
+# Base Options for Material Design. Mainly for use with the Wallpaper Options,
+# or as a fallback option when a Dynamic Color Option is set to an invalid value
+
+## Set to either "Light" or "Dark"
+mode: "Dark"
+## Set to any valid Material You Scheme Names:
+## "TONAL_SPOT", "SPRITZ", "VIBRANT", "EXPRESSIVE", "FRUIT_SALAD", "RAINBOW",
+## "MONOCHROME", "FIDELITY" and "CONTENT"
+scheme: "VIBRANT"
+
+
+# [ Wallpaper Options ]
+# These options will generate a color scheme from a provided wallpaper
+
+## Set to either true or false
+use_wallpaper: true
+
+## Set to a valid wallpaper path
+path_to_wallpaper: ""
