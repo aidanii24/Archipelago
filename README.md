@@ -38,7 +38,7 @@ Below are the available properties that can be set for the `theme.yml` file.
 |`use_wallpaper`|`true`, `false`|Whether to use the provided Wallpaper and automatically generate colors from it. Any custom Material You Color properties set in the file will be ignored if a wallpaper is used.|
 |`path_to_wallpaper`|Image path (e.g. `/home/aginah/Pictures/wallpaper.jpg`)|Path to the wallpaper image.|
 |Dynamic Colors|Color in Hex Format (e.g. `#FF5030`)|The colors as specified in the Material You Color design specification. The main colors that will applied application-wide.|
-|Base16 Colors|Color in Hex Format (e.g. `#FF5030`)|The original 16 Colors as specified by the ANSI Colors standard. These are primarily used to override the Text Colors in `data/user.kv`.
+|Base16 Colors|Color in Hex Format (e.g. `#FF5030`)|The original 16 Colors as specified by the ANSI Colors standard. These are primarily used to override the Text Colors in `data/client.kv`.
 
 ### Dynamic Colors
 
@@ -106,7 +106,7 @@ These are the valid Dynamic Color property names recognized by Archipelago MYE, 
 
 ### Base16/ANSI Colors
 
-These are the valid Base16/ANSI Color names recognized by Archipelago MYE. They are mapped accordingly to the Text Colors specified in `data/user.kv` and will supercede them when these colors are present.
+These are the valid Base16/ANSI Color names recognized by Archipelago MYE. They are mapped accordingly to the Text Colors specified in `data/client.kv` and will supercede them when these colors are present.
 
 - `"base00"` (0, Black)
 - `"base01"` (1, Red)
