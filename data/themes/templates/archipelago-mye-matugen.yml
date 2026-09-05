@@ -21,7 +21,7 @@
 # or as a fallback option when a Dynamic Color Option is set to an invalid value
 
 ## Set to either "Light" or "Dark"
-mode: {{mode}}
+mode: "{{mode}}"
 ## Set to any valid Material You Scheme Names:
 ## "TONAL_SPOT", "SPRITZ", "VIBRANT", "EXPRESSIVE", "FRUIT_SALAD", "RAINBOW",
 ## "MONOCHROME", "FIDELITY" and "CONTENT"
