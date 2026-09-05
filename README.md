@@ -2,6 +2,8 @@ For the original Archipelago README.md and project, please visit the upstream [A
 
 # Archipelago: Material You Enhanced
 
+![image](https://i.imgur.com/FzFnjhf.gif)
+
 A Fork of the Archipelago Launcher that exposes more of the underlying Material You Color features of KivyMD, allowing for more advanced theming.
 
 # Features
