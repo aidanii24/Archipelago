@@ -141,7 +141,7 @@ def run_gui(launch_components: list["Component"], args: Any) -> None:
             super().__init__(args, kwargs)
 
     class Launcher(ThemedApp):
-        base_title: str = "Archipelago Launcher"
+        base_title: str = "Archipelago Launcher MYE"
         top_screen: MDFloatLayout = ObjectProperty(None)
         navigation: MDGridLayout = ObjectProperty(None)
         grid: MDGridLayout = ObjectProperty(None)
