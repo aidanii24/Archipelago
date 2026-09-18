@@ -382,13 +382,24 @@ class ScrollBox(MDScrollView):
 class ToggleButton(MDButton, ToggleButtonBehavior):
     # ColorProperty is needed to bind the colors and make sure they update when new colors are applied
     normal_content_color: str = ColorProperty("000000")
+    normal_background_color: str = ColorProperty("FFFFFF")
     active_content_color: str = ColorProperty("FFFFFF")
+    active_background_color: str = ColorProperty("000000")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.normal_content_color = self.theme_cls.primaryColor
-        self.active_content_color = self.theme_cls.onPrimaryColor
+        try:
+            theme_cls = MDApp.get_running_app().theme_cls
+            if theme_cls:
+                self.normal_content_color = theme_cls.primaryColor
+                self.normal_background_color = theme_cls.surfaceContainerLowColor
+                self.active_content_color = theme_cls.onPrimaryColor
+                self.active_background_color = theme_cls.primaryColor
+
+                theme_cls.bind(surfaceContainerLowColor=lambda i, v: self.on_colors())
+        except Exception as e:
+            logging.error(e)
 
     # Swapping themes is necessary to force update the colors of the text
     @classmethod
@@ -402,13 +413,25 @@ class ToggleButton(MDButton, ToggleButtonBehavior):
         else:
             widget.theme_icon_color = "Primary"
 
+    def on_colors(self):
+        theme_cls = MDApp.get_running_app().theme_cls
+        if theme_cls:
+            self.normal_content_color = theme_cls.primaryColor
+            self.normal_background_color = theme_cls.surfaceContainerLowColor
+            self.active_content_color = theme_cls.onPrimaryColor
+            self.active_background_color = theme_cls.primaryColor
+
+        self.on_state(self, self.state)
+
     def on_state(self, widget, value):
         if value == "normal":
+            self.md_bg_color = self.normal_background_color
             for child in widget.children:
                 self._swap_theme(child)
                 child.text_color = self.normal_content_color
                 child.icon_color = self.normal_content_color
-        if value == "down":
+        elif value == "down":
+            self.md_bg_color = self.active_background_color
             for child in widget.children:
                 self._swap_theme(child)
                 child.text_color = self.active_content_color

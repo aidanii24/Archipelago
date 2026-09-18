@@ -173,6 +173,11 @@ ContainerLayout:
                 cols: 1
                 id: options
 
+<ToggleButton>:
+    theme_bg_color: "Custom"
+    md_bg_color: app.theme_cls.surfaceContainerLowColor if self.state != "down" else app.theme_cls.primaryColor
+    text_color: app.theme_cls.secondaryColor
+
 <MDExpansionPanelContent>:
     md_bg_color: app.theme_cls.surfaceContainerLowColor
 
