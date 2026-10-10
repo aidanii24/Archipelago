@@ -421,21 +421,26 @@ class ToggleButton(MDButton, ToggleButtonBehavior):
             self.active_content_color = theme_cls.onPrimaryColor
             self.active_background_color = theme_cls.primaryColor
 
-        self.on_state(self, self.state)
+        self.set_state_colors(self, swap_theme=False)
 
     def on_state(self, widget, value):
-        if value == "normal":
-            self.md_bg_color = self.normal_background_color
-            for child in widget.children:
+        self.set_state_colors(widget, value)
+
+    def set_state_colors(self, widget, value: str | None = None, swap_theme: bool = True):
+        if not value:
+            value = self.state
+
+        if value == "down":
+            widget.md_bg_color = self.active_background_color
+            text_color = self.active_content_color
+        else:
+            widget.md_bg_color = self.normal_background_color
+            text_color = self.normal_content_color
+
+        for child in widget.children:
+            if swap_theme:
                 self._swap_theme(child)
-                child.text_color = self.normal_content_color
-                child.icon_color = self.normal_content_color
-        elif value == "down":
-            self.md_bg_color = self.active_background_color
-            for child in widget.children:
-                self._swap_theme(child)
-                child.text_color = self.active_content_color
-                child.icon_color = self.active_content_color
+            child.text_color = text_color
 
 
 # thanks kivymd
