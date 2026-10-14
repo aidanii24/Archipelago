@@ -364,7 +364,7 @@ components: list[Component] = [
               description="Open a patch file, downloaded from the room page or provided by the host."),
     Component("Generate Template Options", func=generate_yamls,
               description="Generate template YAMLs for currently installed games."),
-    Component("Archipelago Website", func=lambda: webbrowser.open("https://archipelago.gg/"),
+    Component("Archipelago Website", icon="original", func=lambda: webbrowser.open("https://archipelago.gg/"),
               description="Open archipelago.gg in your browser."),
     Component("Discord Server", icon="discord", func=lambda: webbrowser.open("https://discord.gg/8Z65BR2"),
               description="Join the Discord server to play public multiworlds, report issues, or just chat!"),
@@ -398,6 +398,7 @@ components: list[Component] = [
 icon_paths = {
     'icon': local_path('data', 'icon.png'),
     'discord': local_path('data', 'discord-mark-blue.png'),
+    'original': local_path('data', 'archipelago.png'),
 }
 
 if not is_frozen():
